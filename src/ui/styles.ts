@@ -301,7 +301,7 @@ export const css = `
     text-shadow: none;
 }
 .fso-button:disabled { opacity: 0.55; cursor: default; }
-.fso-button-primary { background: var(--fso-world); color: var(--fso-accent-text); box-shadow: 0 8px 28px -10px var(--fso-world); }
+.fso-button-primary { background: var(--fso-world); color: var(--fso-accent-text); }
 .fso-button-secondary { background: rgb(255 255 255 / 0.06); color: var(--fso-text); border-color: var(--fso-line); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
 .fso-button-text { background: transparent; color: var(--fso-text); padding-left: 12px; padding-right: 12px; }
 .fso-button .fso-icon { width: 20px; height: 20px; flex-shrink: 0; }
@@ -321,7 +321,6 @@ export const css = `
     font: inherit;
     text-align: left;
     cursor: pointer;
-    box-shadow: 0 12px 40px -12px var(--fso-world);
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
     text-shadow: none;

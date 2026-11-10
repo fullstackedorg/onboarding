@@ -480,11 +480,15 @@ export function startOnboarding(
             ],
             { showSkip: true, skyContent: [chip] }
         );
-        setNav(
-            step,
-            { label: "Back", onClick: welcome, disabled: true },
-            { label: "Building…", onClick: () => {}, disabled: true }
-        );
+        // Every step waits for the person: Next stays off while a step runs,
+        // turns on once it's done, and only a click moves on
+        const lockNav = () =>
+            setNav(
+                step,
+                { label: "Back", onClick: welcome, disabled: true },
+                { label: "Next", onClick: () => {}, disabled: true }
+            );
+        lockNav();
 
         // What really happened, step by step. On a fast device the whole build
         // takes a second; the world replays it at a pace the eye can follow
@@ -610,12 +614,35 @@ export function startOnboarding(
                 { label: "Back", onClick: welcome },
                 { label: "Next", onClick: () => ready(report) }
             );
-            setTimeout(
-                () =>
-                    current() &&
-                    main.dataset.screen === "build" &&
-                    ready(report),
-                reduced ? 1500 : 4200
+        };
+
+        // a step is done on screen: wait for Next before the following one
+        let waiting = false;
+        const stepDone = () => {
+            waiting = true;
+            setNav(
+                step,
+                { label: "Back", onClick: welcome, disabled: true },
+                {
+                    label: "Next",
+                    onClick: () => {
+                        if (!waiting || !current()) return;
+                        waiting = false;
+                        shown++;
+                        shownFraction = 0;
+                        shownLogs = 0;
+                        if (shown === STEPS.length) {
+                            // the build may still be writing its report;
+                            // its .then ignites then
+                            if (report) ignite(report);
+                            else lockNav();
+                            return;
+                        }
+                        lockNav();
+                        last = performance.now();
+                        requestAnimationFrame(play);
+                    }
+                }
             );
         };
 
@@ -655,13 +682,8 @@ export function startOnboarding(
             }
             if (r.done && shownFraction >= 1) {
                 feedTo(id, r.logs.length);
-                shown++;
-                shownFraction = 0;
-                shownLogs = 0;
-                if (shown === STEPS.length) {
-                    if (report) ignite(report);
-                    return;
-                }
+                stepDone();
+                return;
             }
             requestAnimationFrame(play);
         };
