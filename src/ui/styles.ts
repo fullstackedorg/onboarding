@@ -153,7 +153,10 @@ export const css = `
     text-transform: uppercase;
     color: color-mix(in srgb, var(--fso-world) 60%, white);
 }
-.fso-big { font-size: 25px; font-weight: 650; line-height: 1.2; letter-spacing: -0.02em; text-wrap: balance; }
+.fso-big { display: grid; font-size: 25px; font-weight: 650; line-height: 1.2; letter-spacing: -0.02em; text-wrap: balance; }
+/* the build's titles share one cell: the tallest sizes it, one shows */
+.fso-big > span { grid-area: 1 / 1; visibility: hidden; }
+.fso-big > span[data-current] { visibility: visible; }
 .fso-small { color: var(--fso-muted); font-size: 16px; }
 .fso-small:empty { display: none; }
 .fso-steps-bar { display: flex; gap: 6px; margin: 0 0 14px; }

@@ -333,8 +333,34 @@ export function startOnboarding(
         requestAnimationFrame(frameWorld);
     }
 
+    // The keyboard: → and Enter are Next (once it's enabled), Escape is Skip
+    // (where Skip shows). Enter on a focused button or link stays that
+    // button's; a held key doesn't run through the steps.
+    const onKey = (e: KeyboardEvent) => {
+        if (finished || e.defaultPrevented || e.repeat) return;
+        if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+        if (e.key === "ArrowRight" || e.key === "Enter") {
+            const target = e.target as Element | null;
+            if (
+                e.key === "Enter" &&
+                target?.closest?.("button, a, input, textarea, select")
+            )
+                return;
+            const next = nav.querySelector<HTMLButtonElement>(".fso-nav-next");
+            if (!next || next.disabled) return;
+            e.preventDefault();
+            next.click();
+        } else if (e.key === "Escape") {
+            if (skip.style.visibility === "hidden") return;
+            e.preventDefault();
+            skip.click();
+        }
+    };
+    document.addEventListener("keydown", onKey);
+
     function unmount() {
         buildRun++;
+        document.removeEventListener("keydown", onKey);
         ro.disconnect();
         world?.dispose();
         root.remove();
@@ -457,7 +483,18 @@ export function startOnboarding(
             })
         );
         const eyebrow = h("p", { class: "fso-eyebrow" });
-        const big = h("p", { class: "fso-big" });
+        // Every title of the build, stacked in one grid cell: only the
+        // current one shows, but all of them size the cell, so it is as tall
+        // as the longest title at this width (two lines on a phone, one on a
+        // wide screen) and nothing below or above moves between steps.
+        // Words that aren't a step's title (a failure) use the last line.
+        const titles = [
+            ...STEPS.map((s) => WORDS.steps[s.id].big),
+            WORDS.running.big
+        ];
+        const titleEls = titles.map((t) => h("span", null, t));
+        const otherTitle = h("span");
+        const big = h("p", { class: "fso-big" }, titleEls, otherTitle);
         const small = h("p", { class: "fso-small" });
         // the details, folded: a record of everything that happened, one
         // section per step as it plays, kept for the whole build
@@ -512,9 +549,13 @@ export function startOnboarding(
             if (shownCopy === key) return;
             shownCopy = key;
             eyebrow.textContent = copy.name;
-            big.textContent = copy.big;
+            const index = titles.indexOf(copy.big);
+            if (index < 0) otherTitle.textContent = copy.big;
+            const current = titleEls[index] ?? otherTitle;
+            for (const el of [...titleEls, otherTitle])
+                el.toggleAttribute("data-current", el === current);
             small.textContent = copy.small;
-            for (const node of [big, small]) {
+            for (const node of [current, small]) {
                 node.classList.remove("fso-in");
                 void node.offsetWidth;
                 node.classList.add("fso-in");
