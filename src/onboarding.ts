@@ -495,14 +495,13 @@ export function startOnboarding(
             world.animate("uAzim", 0, 1.1, { ease: "inOut" });
         }
 
-        // the stepper: the three build steps, then the run
+        // the stepper: the three build steps; the run follows the build on
+        // its own (the details still record it)
         type UiStep = StepId | "run";
-        const uiSteps: UiStep[] = [...STEPS.map((s) => s.id), "run"];
         const segments = new Map(
-            uiSteps.map((id) => {
+            STEPS.map(({ id }) => {
                 const fill = h("span", { class: "fso-seg-fill" });
-                const name =
-                    id === "run" ? WORDS.running.name : WORDS.steps[id].name;
+                const name = WORDS.steps[id].name;
                 return [
                     id,
                     {
@@ -729,7 +728,8 @@ export function startOnboarding(
             if (id === "bundle") world.follow("uCore", fraction);
         };
 
-        // 4. Run: the core bursts into the world, the project is alive
+        // Run, right after the build (no Next in between): the core bursts
+        // into the world, the project is alive
         let ran = false;
         const runStep = (report: BuildReport) => {
             if (ran || !current()) return;
@@ -762,25 +762,27 @@ export function startOnboarding(
             }
             flash();
             lockNav();
-            const fill = segments.get("run").fill;
-            const seconds = reduced ? 1 : 3.2;
-            const start = performance.now();
-            const tick = (t: number) => {
-                if (!current()) return;
-                const f = Math.min(1, (t - start) / 1000 / seconds);
-                fill.style.width = `${Math.round(f * 100)}%`;
-                if (f < 1) {
-                    requestAnimationFrame(tick);
-                    return;
-                }
-                markDone("run", "running");
-                setNext({ label: "Next", onClick: () => ready(report) });
-            };
-            requestAnimationFrame(tick);
+            // Next once the burst has played
+            setTimeout(
+                () => {
+                    if (!current()) return;
+                    markDone("run", "running");
+                    setNext({ label: "Next", onClick: () => ready(report) });
+                },
+                reduced ? 1000 : 3200
+            );
         };
 
-        // a step is done on screen: wait for Next before the following one
+        // a step is done on screen: wait for Next before the following one,
+        // except after the last, where the run follows on its own
         const stepDone = () => {
+            if (shown === STEPS.length - 1) {
+                shown++;
+                // the build may still be writing its report: its .then runs
+                // the run then
+                if (report) runStep(report);
+                return;
+            }
             waiting = true;
             setNext({
                 label: "Next",
@@ -790,12 +792,6 @@ export function startOnboarding(
                     shown++;
                     shownFraction = 0;
                     lockNav();
-                    if (shown === STEPS.length) {
-                        // the build may still be writing its report: its
-                        // .then runs the last step then
-                        if (report) runStep(report);
-                        return;
-                    }
                     last = performance.now();
                     requestAnimationFrame(play);
                 }
@@ -926,7 +922,8 @@ export function startOnboarding(
             .then((result) => {
                 if (!current() || failure) return;
                 report = result;
-                // Next may have been clicked already, waiting for this
+                // the build may have finished on screen already, waiting
+                // for this
                 if (shown === STEPS.length) runStep(result);
             })
             .catch((e) => {
