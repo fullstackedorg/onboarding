@@ -1,6 +1,6 @@
 import fs from "fs";
 
-// what View source and the stats leave out: git's data, installed packages,
+// what the stats and the excerpt leave out: git's data, installed packages,
 // build output and the demo's saved state
 const IGNORED = new Set([".git", "node_modules", "out", "user_data"]);
 
@@ -34,16 +34,4 @@ export async function listFiles(dir: string, prefix = ""): Promise<string[]> {
         else files.push(rel);
     }
     return files;
-}
-
-const MAX_PREVIEW = 512 * 1024;
-
-export async function readPreview(
-    path: string
-): Promise<{ text: string } | { binary: number } | { tooLarge: number }> {
-    const stats = await fs.promises.stat(path);
-    if (stats.size > MAX_PREVIEW) return { tooLarge: stats.size };
-    const data = (await fs.promises.readFile(path)) as Uint8Array;
-    if (data.subarray(0, 8000).includes(0)) return { binary: stats.size };
-    return { text: new TextDecoder().decode(data) };
 }

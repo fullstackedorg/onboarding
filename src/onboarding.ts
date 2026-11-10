@@ -11,7 +11,6 @@ import {
 } from "./build";
 import { findExcerpt, type Excerpt } from "./excerpt";
 import { DEMO_DOWNLOAD, DEMO_PACKAGES } from "./demo-pin";
-import { listDirectory, readPreview } from "./files";
 import { formatBytes } from "./format";
 import { button, h, icon, type Child } from "./ui/dom";
 import { css } from "./ui/styles";
@@ -246,8 +245,8 @@ export function startOnboarding(
         expanded?: boolean; // a toggle (Show details)
     };
 
-    // left: a secondary action (Show details, View the source) or nothing;
-    // right: Next, disabled while a step runs
+    // left: Show details, once there is a record, or nothing; right: Next,
+    // disabled while a step runs
     function setNav(side: NavAction | null, next: NavAction | null) {
         const sideButton = side
             ? button(side.label, side.onClick, "secondary", {
@@ -278,13 +277,55 @@ export function startOnboarding(
         );
     }
 
+    // The build's record (Show details): made by the build, kept until the
+    // end, folded on each new screen
+    let detailsEl: HTMLElement | null = null;
+    let detailsOpen = false;
+    let nextAction: NavAction | null = null;
+
+    function setDetails(open: boolean) {
+        detailsOpen = open && !!detailsEl;
+        if (detailsEl) detailsEl.hidden = !detailsOpen;
+        // the world steps back while the details are read
+        root.classList.toggle("fso-reading", detailsOpen);
+        requestAnimationFrame(frameWorld);
+    }
+
+    function renderNav() {
+        setNav(
+            detailsEl
+                ? {
+                      label: detailsOpen ? "Hide details" : "Show details",
+                      expanded: detailsOpen,
+                      onClick: () => {
+                          setDetails(!detailsOpen);
+                          renderNav();
+                          if (detailsOpen)
+                              requestAnimationFrame(() =>
+                                  detailsEl?.scrollIntoView({
+                                      block: "nearest",
+                                      behavior: reduced ? "auto" : "smooth"
+                                  })
+                              );
+                      }
+                  }
+                : null,
+            nextAction
+        );
+    }
+
+    function setNext(next: NavAction | null) {
+        nextAction = next;
+        renderNav();
+    }
+
     function show(
-        screen: "welcome" | "build" | "ready" | "source",
+        screen: "welcome" | "build" | "ready",
         content: Node[],
         { showSkip = false, skyContent = [] as Node[] } = {}
     ) {
         main.dataset.screen = screen;
-        root.classList.remove("fso-reading");
+        setDetails(false);
         words.replaceChildren(...content.filter(Boolean));
         sky.replaceChildren(...skyContent);
         skip.style.visibility = showSkip ? "visible" : "hidden";
@@ -498,45 +539,10 @@ export function startOnboarding(
             { showSkip: true, skyContent: [chip] }
         );
 
-        // Show details on the left; Next on the right. Every step waits for
-        // the person: Next stays off while a step runs, turns on once it's
-        // done, and only a click moves on.
-        let detailsOpen = false;
-        let nextAction: NavAction = {
-            label: "Next",
-            onClick: () => {},
-            disabled: true
-        };
-        const setDetails = (open: boolean) => {
-            detailsOpen = open;
-            details.hidden = !open;
-            // the world steps back while the details are read
-            root.classList.toggle("fso-reading", open);
-            requestAnimationFrame(frameWorld);
-        };
-        const renderNav = () =>
-            setNav(
-                {
-                    label: detailsOpen ? "Hide details" : "Show details",
-                    expanded: detailsOpen,
-                    onClick: () => {
-                        setDetails(!detailsOpen);
-                        renderNav();
-                        if (detailsOpen)
-                            requestAnimationFrame(() =>
-                                details.scrollIntoView({
-                                    block: "nearest",
-                                    behavior: reduced ? "auto" : "smooth"
-                                })
-                            );
-                    }
-                },
-                nextAction
-            );
-        const setNext = (next: NavAction) => {
-            nextAction = next;
-            renderNav();
-        };
+        // this build's record is the one Show details unfolds, until the end
+        detailsEl = details;
+        // Every step waits for the person: Next stays off while a step runs,
+        // turns on once it's done, and only a click moves on.
         const lockNav = () =>
             setNext({ label: "Next", onClick: () => {}, disabled: true });
         lockNav();
@@ -907,100 +913,14 @@ export function startOnboarding(
                     h("span", null, "See what's inside.")
                 )
             ),
-            note
+            note,
+            // the build's record, folded: Show details
+            detailsEl
         ]);
-        setNav(
-            {
-                label: [icon("file"), h("span", null, "View the source")],
-                onClick: () => source(report, `/${report.directory}`)
-            },
-            {
-                label: continueLabel,
-                onClick: () => finish({ outcome: "built", report })
-            }
-        );
-    }
-
-    // View source: the downloaded files, read-only. The bar's ‹ goes up a
-    // folder (from the top, back to the ready screen); Done goes back.
-    async function source(report: BuildReport, dir: string) {
-        const rootDir = `/${report.directory}`;
-        const up = () =>
-            dir === rootDir
-                ? ready(report)
-                : source(report, dir.slice(0, dir.lastIndexOf("/")));
-        const list = h("ul", { class: "fso-files" });
-        show("source", [sourceBar(dir.slice(1) + "/", up), list]);
-        setNav(null, { label: "Done", onClick: () => ready(report) });
-        try {
-            for (const entry of await listDirectory(dir)) {
-                list.append(
-                    h(
-                        "li",
-                        null,
-                        h(
-                            "button",
-                            {
-                                type: "button",
-                                onclick: () =>
-                                    entry.directory
-                                        ? source(report, entry.path)
-                                        : file(report, entry.path)
-                            },
-                            icon(entry.directory ? "folder" : "file"),
-                            entry.name + (entry.directory ? "/" : "")
-                        )
-                    )
-                );
-            }
-        } catch (e) {
-            list.replaceWith(
-                h(
-                    "p",
-                    null,
-                    `Could not list ${dir}: ${(e as any)?.message ?? e}`
-                )
-            );
-        }
-    }
-
-    async function file(report: BuildReport, path: string) {
-        const parent = path.slice(0, path.lastIndexOf("/"));
-        const content = h("pre", null, "Loading…");
-        show("source", [
-            sourceBar(path.slice(1), () => source(report, parent)),
-            h("div", { class: "fso-file-view" }, content)
-        ]);
-        setNav(null, { label: "Done", onClick: () => ready(report) });
-        try {
-            const preview = await readPreview(path);
-            content.textContent =
-                "text" in preview
-                    ? preview.text
-                    : "binary" in preview
-                      ? `Binary file, ${formatBytes(preview.binary)}`
-                      : `Too large to show here, ${formatBytes(preview.tooLarge)}`;
-        } catch (e) {
-            content.textContent = `Could not read ${path}: ${(e as any)?.message ?? e}`;
-        }
-    }
-
-    function sourceBar(title: string, up: () => void) {
-        return h(
-            "div",
-            { class: "fso-source-bar" },
-            h(
-                "button",
-                {
-                    type: "button",
-                    class: "fso-source-up",
-                    "aria-label": "Up",
-                    onclick: up
-                },
-                icon("back")
-            ),
-            h("span", { class: "fso-source-path" }, title)
-        );
+        setNext({
+            label: continueLabel,
+            onClick: () => finish({ outcome: "built", report })
+        });
     }
 
     welcome();

@@ -127,8 +127,6 @@ export const css = `
 }
 /* the world shows through the sky; the words sit at the bottom */
 .fso-sky { position: relative; flex: 1 0 34vh; min-height: 160px; }
-.fso-main[data-screen="source"] .fso-sky { flex: 0 0 0; min-height: 0; }
-.fso-main[data-screen="source"] { background: rgb(2 4 10 / 0.86); }
 .fso-words { position: relative; min-width: 0; overflow-wrap: break-word; text-shadow: 0 1px 2px rgb(0 0 0 / 0.5), 0 0 28px rgb(0 0 0 / 0.6); }
 
 .fso h1 {
@@ -351,30 +349,6 @@ export const css = `
 .fso-icon { display: inline-flex; width: 24px; height: 24px; }
 .fso-icon svg { width: 100%; height: 100%; }
 
-.fso-source-bar { display: flex; align-items: center; gap: 8px; margin: 12px 0 8px; }
-.fso-source-up { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-left: -10px; flex-shrink: 0; border: 0; background: transparent; color: var(--fso-text); cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.fso-source-up .fso-icon { color: inherit; }
-.fso-source-path { font-family: var(--fso-mono); font-size: 14px; overflow-wrap: anywhere; }
-.fso-files { list-style: none; margin: 0 0 16px; padding: 0; border: 1px solid var(--fso-line); border-radius: var(--fso-radius); background: var(--fso-card); overflow: hidden; }
-.fso-files li + li { border-top: 1px solid var(--fso-line); }
-.fso-files button {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    width: 100%;
-    min-height: 44px;
-    padding: 8px 14px;
-    border: 0;
-    background: transparent;
-    color: inherit;
-    font: inherit;
-    font-family: var(--fso-mono);
-    font-size: 14px;
-    text-align: left;
-    cursor: pointer;
-}
-.fso-files .fso-icon { color: var(--fso-muted); width: 20px; height: 20px; flex-shrink: 0; }
-.fso-file-view pre { max-height: none; }
 
 /* the smallest phones: both nav buttons fit, without the icon */
 @media (max-width: 359px) {
