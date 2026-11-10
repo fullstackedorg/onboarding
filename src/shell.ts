@@ -20,7 +20,6 @@ export default async function startup(shell: ShellStartup) {
     const el = document.createElement("div");
     document.body.append(el);
     startOnboarding(el, {
-        continueLabel: "Open the terminal",
         onDone: () => {
             el.remove();
             shell.openTerminal();

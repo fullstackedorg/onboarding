@@ -577,8 +577,17 @@ export class World {
             Math.cos(azim) * Math.cos(elev) * dist
         ];
 
-        // the world turns once it exists
-        if (!still) this.spin += dt * 0.12 * this.values.uWorld;
+        // The world turns once it exists. The build's shapes (the stream,
+        // the clusters, the core) are laid out facing the camera, so the turn
+        // applies only as much as the world exists: when the world comes
+        // apart, the turn unwinds to the front (never edge-on, however long
+        // the welcome lasted), and a new world starts turning from there.
+        const exists = this.values.uWorld;
+        if (exists <= 0) this.spin = 0;
+        else if (!still) this.spin += dt * 0.12 * exists;
+        // never more than half a turn to unwind
+        if (exists >= 1 && Math.abs(this.spin) > Math.PI)
+            this.spin -= Math.sign(this.spin) * 2 * Math.PI;
 
         const proj = perspective(
             FOV,
@@ -589,7 +598,7 @@ export class World {
             this.height
         );
         const view = lookAtOrigin(eye);
-        const model = rotationY(this.spin);
+        const model = rotationY(this.spin * exists);
         const modelView = multiply(view, model);
         this.viewProjection = multiply(proj, modelView);
 

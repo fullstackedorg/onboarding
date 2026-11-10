@@ -209,21 +209,25 @@ export const css = `
 
 .fso-details { margin: 4px 0 0; text-shadow: none; min-width: 0; animation: fso-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 .fso-details[hidden] { display: none; }
-.fso-feed {
-    list-style: none;
-    margin: 0 0 8px;
-    padding: 10px 12px;
-    border-radius: 10px;
-    background: rgb(0 0 0 / 0.45);
-    border: 1px solid var(--fso-line);
+/* the record: one section per step, kept for the whole build */
+.fso-record { margin: 0 0 14px; }
+.fso-record h3 {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0 0 6px;
     font-family: var(--fso-mono);
-    font-size: 12px;
-    line-height: 1.5;
-    color: var(--fso-muted);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--fso-world) 60%, white);
 }
-.fso-feed:empty { display: none; }
-.fso-feed li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.fso-feed li:last-child { color: var(--fso-text); }
+.fso-record-done { display: inline-flex; align-items: center; gap: 4px; min-width: 0; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--fso-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fso-record-done .fso-icon { width: 14px; height: 14px; flex-shrink: 0; color: var(--fso-success); }
+.fso-record pre[hidden] { display: none; }
+.fso-details pre { max-height: none; }
 .fso pre {
     margin: 0;
     padding: 12px;

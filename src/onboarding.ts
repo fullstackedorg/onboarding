@@ -33,7 +33,8 @@ export type OnboardingOptions = {
     // the hand-over, after `onboarding = "1"` is saved and the onboarding is
     // removed from the page
     onDone: (stats: OnboardingStats) => void | Promise<void>;
-    // label of the button that calls onDone (default "Continue")
+    // label of the last button, once the demo project is ready (default
+    // "Finish"); offline or after a failure, the way out says "Continue"
     continueLabel?: string;
     // where the demo is cloned, from the projects folder (default "demo")
     cloneDir?: string;
@@ -121,7 +122,7 @@ export function startOnboarding(
     el: HTMLElement,
     options: OnboardingOptions
 ): OnboardingHandle {
-    const continueLabel = options.continueLabel ?? "Continue";
+    const continueLabel = options.continueLabel ?? "Finish";
     const cloneDir = options.cloneDir ?? "demo";
     const startedAt = performance.now();
     const reduced = reducedMotion();
@@ -359,7 +360,7 @@ export function startOnboarding(
             null,
             offline
                 ? {
-                      label: continueLabel,
+                      label: "Continue",
                       onClick: () => finish({ outcome: "offline" })
                   }
                 : { label: "Run the demo", onClick: build }
@@ -393,6 +394,8 @@ export function startOnboarding(
             world.animate("uWorld", 0, 1.1, { ease: "inOut" });
             world.animate("uFrame", 1.2, 6, { ease: "out" });
             world.animate("uElev", 0.1, 1.5);
+            // face the build head-on, whatever the camera did before
+            world.animate("uAzim", 0, 1.1, { ease: "inOut" });
         }
 
         // the stepper: the three build steps, then the run
@@ -415,17 +418,48 @@ export function startOnboarding(
         const eyebrow = h("p", { class: "fso-eyebrow" });
         const big = h("p", { class: "fso-big" });
         const small = h("p", { class: "fso-small" });
-        // the details, folded: the project's own lines, the feed, the log
-        const codeSlot = h("div");
-        const feedEl = h("ol", { class: "fso-feed" });
-        const logEl = h("pre", { "aria-live": "off" });
-        const details = h(
-            "div",
-            { class: "fso-details", hidden: true },
-            codeSlot,
-            feedEl,
-            logEl
-        );
+        // the details, folded: a record of everything that happened, one
+        // section per step as it plays, kept for the whole build
+        const details = h("div", { class: "fso-details", hidden: true });
+        type Entry = {
+            done: HTMLElement;
+            extra: HTMLElement;
+            log: HTMLPreElement;
+        };
+        const records = new Map<UiStep, Entry>();
+        const record = (id: UiStep): Entry => {
+            let r = records.get(id);
+            if (r) return r;
+            const name =
+                id === "run" ? WORDS.running.name : WORDS.steps[id].name;
+            r = {
+                done: h("span", { class: "fso-record-done" }),
+                extra: h("div"),
+                log: h("pre", { "aria-live": "off" })
+            };
+            r.log.hidden = true;
+            details.append(
+                h(
+                    "section",
+                    { class: "fso-record" },
+                    h("h3", null, name, r.done),
+                    r.extra,
+                    r.log
+                )
+            );
+            records.set(id, r);
+            return r;
+        };
+        const writeLines = (id: UiStep, lines: string[]) => {
+            if (!lines.length) return;
+            const log = record(id).log;
+            log.hidden = false;
+            log.textContent += lines.join("\n") + "\n";
+        };
+        const markDone = (id: UiStep, summary: string) => {
+            const r = record(id);
+            r.done.replaceChildren(icon("check"), summary);
+        };
         const errorSlot = h("div");
         const chip = h("div", { class: "fso-source-chip" });
         let shownCopy = "";
@@ -535,29 +569,33 @@ export function startOnboarding(
         let report: BuildReport | null = null;
         let failure: { step: StepId; message: string } | null = null;
         let targetDir = `/${cloneDir}`;
-        let logText = "";
+        const summaries: Partial<Record<StepId, string>> = {};
         let lastActivity = performance.now();
         const alive = () => (lastActivity = performance.now());
 
         let shown = 0;
         let shownFraction = 0;
         let shownSince = performance.now();
-        let shownLogs = 0;
         let last = performance.now();
         let waiting = false;
-        const feedLines: string[] = [];
+        // how many of each step's lines are in the record
+        const written: Record<StepId, number> = {
+            download: 0,
+            install: 0,
+            bundle: 0
+        };
 
         const feedTo = (id: StepId, count: number) => {
             const logs = real[id].logs;
-            while (shownLogs < Math.min(count, logs.length)) {
-                feedLines.push(logs[shownLogs++]);
-                if (feedLines.length > 4) feedLines.shift();
-            }
-            feedEl.replaceChildren(...feedLines.map((l) => h("li", null, l)));
+            const to = Math.min(count, logs.length);
+            if (to <= written[id]) return;
+            writeLines(id, logs.slice(written[id], to));
+            written[id] = to;
         };
 
         const startStep = (id: StepId) => {
             say(id, WORDS.steps[id]);
+            record(id);
             shownSince = performance.now();
             chip.replaceChildren();
             if (id === "download")
@@ -583,7 +621,9 @@ export function startOnboarding(
                 // one, for the curious, in the details
                 findExcerpt(targetDir).then((excerpt) => {
                     if (excerpt && current())
-                        codeSlot.replaceChildren(codeCard(excerpt));
+                        record("bundle").extra.replaceChildren(
+                            codeCard(excerpt)
+                        );
                 });
             if (!world) return;
             if (id === "install") {
@@ -620,6 +660,14 @@ export function startOnboarding(
             built = report;
             chip.replaceChildren();
             say("running", WORDS.running);
+            // lines the build wrote after its last step (build.json)
+            feedTo("bundle", Infinity);
+            writeLines("run", [
+                ...report.bundle.outputs.map(
+                    (o) => `out/${o.name}  ${formatBytes(o.bytes)}`
+                ),
+                `Built on this device in ${report.seconds.total} s, in ${report.directory}/`
+            ]);
             if (world) {
                 // the core bursts into the world; the camera is thrown back by
                 // the blast, then dives in, down to the ring's plane
@@ -648,6 +696,7 @@ export function startOnboarding(
                     requestAnimationFrame(tick);
                     return;
                 }
+                markDone("run", "running");
                 setNext({ label: "Next", onClick: () => ready(report) });
             };
             requestAnimationFrame(tick);
@@ -663,7 +712,6 @@ export function startOnboarding(
                     waiting = false;
                     shown++;
                     shownFraction = 0;
-                    shownLogs = 0;
                     lockNav();
                     if (shown === STEPS.length) {
                         // the build may still be writing its report: its
@@ -714,6 +762,7 @@ export function startOnboarding(
 
             if (r.done && shownFraction >= 1) {
                 feedTo(id, r.logs.length);
+                markDone(id, summaries[id] ?? "done");
                 stepDone();
                 return;
             }
@@ -724,6 +773,9 @@ export function startOnboarding(
         const failed = (failedStep: StepId, message: string) => {
             if (!current()) return;
             clearInterval(watchdog);
+            // everything the failed step wrote, its error last
+            record(failedStep);
+            feedTo(failedStep, Infinity);
             say(`failed-${failedStep}`, {
                 name: WORDS.steps[failedStep].name,
                 big: "That didn't work.",
@@ -731,7 +783,7 @@ export function startOnboarding(
             });
             setDetails(true);
             errorSlot.replaceChildren(
-                button(continueLabel, () =>
+                button("Continue", () =>
                     finish({
                         outcome: "failed",
                         error: { step: failedStep, message }
@@ -761,8 +813,9 @@ export function startOnboarding(
             if (realStep === "bundle" || real[realStep].done) return;
             if ((performance.now() - lastActivity) / 1000 < STALL_SECONDS)
                 return;
-            logText += `No progress for ${STALL_SECONDS} seconds\n`;
-            logEl.textContent = logText;
+            real[realStep].logs.push(
+                `No progress for ${STALL_SECONDS} seconds`
+            );
             fail(realStep, `no progress for ${STALL_SECONDS} seconds`);
         }, 2000);
 
@@ -781,16 +834,15 @@ export function startOnboarding(
                 alive();
                 real[id].snapshots.push({ ...p });
             },
-            onStepDone(id) {
+            onStepDone(id, summary) {
                 if (!current()) return;
                 alive();
+                summaries[id] = summary;
                 real[id].done = true;
             },
             onLog(line) {
                 if (!current()) return;
                 alive();
-                logText += line + "\n";
-                logEl.textContent = logText;
                 real[realStep].logs.push(line);
             }
         })
