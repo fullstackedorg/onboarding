@@ -1,0 +1,8 @@
+node_modules
+out
+# what `npm start` clones and builds (dev/ is its projects folder)
+/dev/demo/
+/dev/demo-*/
+# bundleFile outputs (the CLI's -p plugins, index.ts as a plugin)
+*.ts.js
+.DS_Store

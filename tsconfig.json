@@ -1,0 +1,14 @@
+{
+    "compilerOptions": {
+        "module": "esnext",
+        "target": "esnext",
+        "moduleResolution": "bundler",
+        "lib": ["esnext", "dom", "dom.iterable"],
+        "types": ["node"],
+        "strictNullChecks": false,
+        "noEmit": true,
+        "skipLibCheck": true,
+        "allowImportingTsExtensions": true
+    },
+    "include": ["index.ts", "dev/index.ts", "src", "scripts"]
+}

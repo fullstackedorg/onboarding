@@ -1,0 +1,28 @@
+{
+    "name": "@fullstacked/onboarding",
+    "version": "0.1.0",
+    "private": true,
+    "description": "First-launch onboarding of the FullStacked app: builds the demo live on the device.",
+    "license": "MIT",
+    "type": "module",
+    "main": "index.ts",
+    "scripts": {
+        "start": "fullstacked dev",
+        "build": "fullstacked --build dev",
+        "pin-demo": "node scripts/pin-demo.ts",
+        "typecheck": "tsc --noEmit"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/fullstackedorg/onboarding.git"
+    },
+    "prettier": {
+        "tabWidth": 4,
+        "trailingComma": "none"
+    },
+    "devDependencies": {
+        "@types/node": "^26.6.6",
+        "fullstacked": "^1.0.0",
+        "typescript": "^7.0.2"
+    }
+}
