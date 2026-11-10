@@ -4,9 +4,17 @@
 // Everything is scoped under .fso. A dark stage whatever the system theme
 // (the world glows on it). Mobile first: 375 px, safe areas, 44 px targets.
 
+// The page colour while the onboarding is up: the stage's top edge fades
+// into it, and the onboarding paints <html>, <body> and theme-color with it,
+// since the native shells take the status bar colour from the page (iOS
+// underPageBackgroundColor, browsers' theme-color). A deep navy, not black,
+// so it reads as the top of the blob's glow.
+export const PAGE_COLOR = "#06101f";
+
 export const css = `
 .fso {
-    --fso-stage: #02040a;
+    --fso-top: ${PAGE_COLOR};
+    --fso-stage: #030914;
     --fso-world: #219ef2;
     --fso-text: #f3f6fd;
     --fso-muted: rgb(214 223 242 / 0.7);
@@ -47,12 +55,14 @@ export const css = `
     background:
         radial-gradient(120% 70% at 50% var(--fso-cy, 40%), color-mix(in srgb, var(--fso-world) 16%, transparent) 0%, transparent 60%),
         radial-gradient(90% 60% at 85% 0%, color-mix(in srgb, var(--fso-world) 9%, transparent) 0%, transparent 70%),
-        linear-gradient(180deg, #050914 0%, var(--fso-stage) 55%, #010205 100%);
+        linear-gradient(180deg, var(--fso-top) 0%, var(--fso-stage) 55%, #02060e 100%);
 }
 .fso-vignette {
     background:
-        radial-gradient(130% 90% at 50% 45%, transparent 55%, rgb(0 0 0 / 0.55) 100%),
-        linear-gradient(0deg, rgb(2 4 10 / 0.92) 0%, rgb(2 4 10 / 0.6) 30%, transparent 55%);
+        /* a flat top edge, so it joins the status bar without a seam */
+        linear-gradient(180deg, var(--fso-top) 0, color-mix(in srgb, var(--fso-top) 70%, transparent) calc(env(safe-area-inset-top) + 24px), transparent calc(env(safe-area-inset-top) + 120px)),
+        radial-gradient(130% 90% at 50% 45%, transparent 55%, rgb(1 4 10 / 0.55) 100%),
+        linear-gradient(0deg, rgb(3 9 20 / 0.92) 0%, rgb(3 9 20 / 0.6) 30%, transparent 55%);
 }
 .fso-world-label {
     position: absolute;

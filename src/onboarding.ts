@@ -13,7 +13,7 @@ import { findExcerpt, type Excerpt } from "./excerpt";
 import { DEMO_DOWNLOAD, DEMO_PACKAGES } from "./demo-pin";
 import { formatBytes } from "./format";
 import { button, h, icon, type Child } from "./ui/dom";
-import { css } from "./ui/styles";
+import { css, PAGE_COLOR } from "./ui/styles";
 import { createWorld, type World } from "./world/world";
 
 export const ONBOARDING_CONFIG_KEY = "onboarding";
@@ -114,6 +114,34 @@ function injectStyles() {
     }
 }
 
+// The status bar takes its colour from the page (iOS reads the webview's
+// underPageBackgroundColor, browsers read theme-color): paint the page with
+// the stage's top colour while the onboarding is up, and give back whatever
+// was there when it leaves.
+function paintPage() {
+    const html = document.documentElement;
+    const body = document.body;
+    const before = [html.style.backgroundColor, body.style.backgroundColor];
+    html.style.backgroundColor = PAGE_COLOR;
+    body.style.backgroundColor = PAGE_COLOR;
+    let meta = document.querySelector<HTMLMetaElement>(
+        'meta[name="theme-color"]'
+    );
+    const created = !meta;
+    const content = meta?.content;
+    if (!meta) {
+        meta = h("meta", { name: "theme-color" });
+        document.head.append(meta);
+    }
+    meta.content = PAGE_COLOR;
+    return () => {
+        html.style.backgroundColor = before[0];
+        body.style.backgroundColor = before[1];
+        if (created) meta.remove();
+        else meta.content = content ?? "";
+    };
+}
+
 const reducedMotion = () =>
     window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
@@ -190,6 +218,7 @@ export function startOnboarding(
     );
     root.style.setProperty("--fso-world", WORLD_COLOR);
     el.append(root);
+    const unpaintPage = paintPage();
 
     const world: World | null = createWorld({
         canvas,
@@ -364,6 +393,7 @@ export function startOnboarding(
         ro.disconnect();
         world?.dispose();
         root.remove();
+        unpaintPage();
         if (!document.querySelector(".fso")) {
             document.getElementById(STYLE_ID)?.remove();
         }
