@@ -4,11 +4,9 @@ export {
     shouldRunOnboarding,
     markOnboardingDone,
     ONBOARDING_CONFIG_KEY,
-    DEFAULT_LINKS,
     type OnboardingOptions,
     type OnboardingStats,
-    type OnboardingHandle,
-    type FooterLink
+    type OnboardingHandle
 } from "./onboarding";
 export type { BuildReport, StepId } from "./build";
 export { DEMO_COMMIT, DEMO_REPOSITORY } from "./demo-pin";

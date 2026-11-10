@@ -19,8 +19,6 @@ import { createWorld, type World } from "./world/world";
 
 export const ONBOARDING_CONFIG_KEY = "onboarding";
 
-export type FooterLink = { label: string; href: string };
-
 export type OnboardingStats = {
     // built: the demo was built; skipped: Skip; failed: Continue after a
     // failed step; offline: Continue without network
@@ -39,8 +37,6 @@ export type OnboardingOptions = {
     continueLabel?: string;
     // where the demo is cloned, from the projects folder (default "demo")
     cloneDir?: string;
-    // footer links (default: fullstacked.org, privacy, terms)
-    links?: FooterLink[];
     // behave as if there was no network (development)
     offline?: boolean;
 };
@@ -52,12 +48,8 @@ export type OnboardingHandle = {
     unmount: () => void;
 };
 
-// Privacy and terms are placeholders until the final pages exist
-export const DEFAULT_LINKS: FooterLink[] = [
-    { label: "fullstacked.org", href: "https://fullstacked.org" },
-    { label: "Privacy", href: "https://fullstacked.org/privacy" },
-    { label: "Terms", href: "https://fullstacked.org/terms" }
-];
+// the top left mark links there
+const SITE = "https://fullstacked.org";
 
 // The FullStacked mark, monochrome (the app icon's paths)
 const LOGO = `<svg viewBox="49 6.5 601 709" aria-hidden="true" fill="currentColor"><path d="M73.6316 550.363L358.404 715.202V378.205C358.404 365.062 365.385 352.902 376.758 346.331L637.136 195.618C650.745 187.748 650.745 168.034 637.136 160.124L382.994 13.1106C367.777 4.29613 349.069 4.29613 333.852 13.1106L67.3957 167.247C56.0221 173.818 49.0411 185.977 49.0411 199.16V507.628C49.0411 525.257 58.4145 541.549 73.6316 550.363Z"/><path d="M635.832 338.37L569.82 300.091L415.336 389.526V501.419L635.832 373.744C649.41 365.892 649.41 346.222 635.832 338.37Z"/><path d="M635.793 517.28L569.155 478.687L415.336 567.73V679.976L635.754 552.654C649.332 544.802 649.371 525.133 635.754 517.241L635.793 517.28Z"/></svg>`;
@@ -73,7 +65,7 @@ const WORDS = {
     steps: {
         download: {
             name: "Download",
-            big: "Pulling a real project onto this device.",
+            big: "Pulling demo project onto this device.",
             small: ""
         },
         install: {
@@ -131,7 +123,6 @@ export function startOnboarding(
 ): OnboardingHandle {
     const continueLabel = options.continueLabel ?? "Continue";
     const cloneDir = options.cloneDir ?? "demo";
-    const links = options.links ?? DEFAULT_LINKS;
     const startedAt = performance.now();
     const reduced = reducedMotion();
 
@@ -167,10 +158,12 @@ export function startOnboarding(
     const header = h(
         "header",
         { class: "fso-header" },
-        h("div", {
+        h("a", {
             class: "fso-brand",
-            role: "img",
-            "aria-label": "FullStacked",
+            href: SITE,
+            target: "_blank",
+            rel: "noopener",
+            "aria-label": "FullStacked (fullstacked.org)",
             html: LOGO
         }),
         skip
@@ -180,7 +173,8 @@ export function startOnboarding(
     const words = h("div", { class: "fso-words" });
     const main = h("main", { class: "fso-main" }, sky, words);
     const scroller = h("div", { class: "fso-scroll" }, main);
-    // Back and Next: always at the bottom, in the same place
+    // a secondary action on the left, Next on the right: always at the
+    // bottom, in the same place
     const nav = h("nav", { class: "fso-nav", "aria-label": "Onboarding" });
     const root = h(
         "div",
@@ -192,18 +186,7 @@ export function startOnboarding(
         stage,
         header,
         scroller,
-        nav,
-        h(
-            "footer",
-            { class: "fso-footer" },
-            links.map((link) =>
-                h(
-                    "a",
-                    { href: link.href, target: "_blank", rel: "noopener" },
-                    link.label
-                )
-            )
-        )
+        nav
     );
     root.style.setProperty("--fso-world", WORLD_COLOR);
     el.append(root);
@@ -255,42 +238,42 @@ export function startOnboarding(
     };
 
     // ── nav and screens ─────────────────────────────────────────────────────
-    type NavAction = { label: Child; onClick: () => void; disabled?: boolean };
-    const SCREEN_STEP = { welcome: 1, build: 2, ready: 3, source: 3 };
+    type NavAction = {
+        label: Child;
+        onClick: () => void;
+        disabled?: boolean;
+        expanded?: boolean; // a toggle (Show details)
+    };
 
-    function setNav(
-        step: number,
-        back: NavAction | null,
-        next: NavAction | null
-    ) {
-        const arrow = (dir: "back" | "next") =>
-            icon(dir === "back" ? "arrowLeft" : "arrowRight");
-        const backButton = back
-            ? button(
-                  [arrow("back"), h("span", null, back.label)],
-                  back.onClick,
-                  "secondary",
-                  {
-                      class: "fso-button fso-button-secondary fso-nav-back"
-                  }
-              )
-            : h("span", { class: "fso-nav-back" });
-        if (back?.disabled) (backButton as HTMLButtonElement).disabled = true;
+    // left: a secondary action (Show details, View the source) or nothing;
+    // right: Next, disabled while a step runs
+    function setNav(side: NavAction | null, next: NavAction | null) {
+        const sideButton = side
+            ? button(side.label, side.onClick, "secondary", {
+                  class: "fso-button fso-button-secondary fso-nav-side",
+                  "aria-expanded":
+                      side.expanded === undefined
+                          ? undefined
+                          : String(side.expanded)
+              })
+            : null;
         const nextButton = next
             ? button(
-                  [h("span", null, next.label), arrow("next")],
+                  [h("span", null, next.label), icon("arrowRight")],
                   next.onClick,
                   "primary",
                   {
                       class: "fso-button fso-button-primary fso-nav-next"
                   }
               )
-            : h("span", { class: "fso-nav-next" });
-        if (next?.disabled) (nextButton as HTMLButtonElement).disabled = true;
+            : null;
+        if (next?.disabled) nextButton.disabled = true;
         nav.replaceChildren(
-            backButton,
-            h("span", { class: "fso-nav-step" }, `${step} / 3`),
-            nextButton
+            ...[
+                sideButton,
+                h("span", { class: "fso-nav-spacer" }),
+                nextButton
+            ].filter(Boolean)
         );
     }
 
@@ -300,12 +283,12 @@ export function startOnboarding(
         { showSkip = false, skyContent = [] as Node[] } = {}
     ) {
         main.dataset.screen = screen;
+        root.classList.remove("fso-reading");
         words.replaceChildren(...content.filter(Boolean));
         sky.replaceChildren(...skyContent);
         skip.style.visibility = showSkip ? "visible" : "hidden";
         scroller.scrollTop = 0;
         requestAnimationFrame(frameWorld);
-        return SCREEN_STEP[screen];
     }
 
     function unmount() {
@@ -342,7 +325,7 @@ export function startOnboarding(
     // 1. Welcome
     function welcome() {
         const offline = online === false;
-        const step = show(
+        show(
             "welcome",
             [
                 h("h1", { class: "fso-in" }, "Welcome to FullStacked"),
@@ -373,7 +356,6 @@ export function startOnboarding(
             { showSkip: true }
         );
         setNav(
-            step,
             null,
             offline
                 ? {
@@ -413,17 +395,18 @@ export function startOnboarding(
             world.animate("uElev", 0.1, 1.5);
         }
 
+        // the stepper: the three build steps, then the run
+        type UiStep = StepId | "run";
+        const uiSteps: UiStep[] = [...STEPS.map((s) => s.id), "run"];
         const segments = new Map(
-            STEPS.map((s) => {
+            uiSteps.map((id) => {
                 const fill = h("span", { class: "fso-seg-fill" });
+                const name =
+                    id === "run" ? WORDS.running.name : WORDS.steps[id].name;
                 return [
-                    s.id,
+                    id,
                     {
-                        el: h(
-                            "span",
-                            { class: "fso-seg", title: WORDS.steps[s.id].name },
-                            fill
-                        ),
+                        el: h("span", { class: "fso-seg", title: name }, fill),
                         fill
                     }
                 ] as const;
@@ -432,13 +415,14 @@ export function startOnboarding(
         const eyebrow = h("p", { class: "fso-eyebrow" });
         const big = h("p", { class: "fso-big" });
         const small = h("p", { class: "fso-small" });
-        const extra = h("div", { class: "fso-extra" });
+        // the details, folded: the project's own lines, the feed, the log
+        const codeSlot = h("div");
         const feedEl = h("ol", { class: "fso-feed" });
         const logEl = h("pre", { "aria-live": "off" });
         const details = h(
-            "details",
-            { class: "fso-details" },
-            h("summary", null, "Show the details"),
+            "div",
+            { class: "fso-details", hidden: true },
+            codeSlot,
             feedEl,
             logEl
         );
@@ -463,7 +447,7 @@ export function startOnboarding(
             requestAnimationFrame(frameWorld);
         };
 
-        const step = show(
+        show(
             "build",
             [
                 h(
@@ -474,20 +458,53 @@ export function startOnboarding(
                 eyebrow,
                 big,
                 small,
-                extra,
                 errorSlot,
                 details
             ],
             { showSkip: true, skyContent: [chip] }
         );
-        // Every step waits for the person: Next stays off while a step runs,
-        // turns on once it's done, and only a click moves on
-        const lockNav = () =>
+
+        // Show details on the left; Next on the right. Every step waits for
+        // the person: Next stays off while a step runs, turns on once it's
+        // done, and only a click moves on.
+        let detailsOpen = false;
+        let nextAction: NavAction = {
+            label: "Next",
+            onClick: () => {},
+            disabled: true
+        };
+        const setDetails = (open: boolean) => {
+            detailsOpen = open;
+            details.hidden = !open;
+            // the world steps back while the details are read
+            root.classList.toggle("fso-reading", open);
+            requestAnimationFrame(frameWorld);
+        };
+        const renderNav = () =>
             setNav(
-                step,
-                { label: "Back", onClick: welcome, disabled: true },
-                { label: "Next", onClick: () => {}, disabled: true }
+                {
+                    label: detailsOpen ? "Hide details" : "Show details",
+                    expanded: detailsOpen,
+                    onClick: () => {
+                        setDetails(!detailsOpen);
+                        renderNav();
+                        if (detailsOpen)
+                            requestAnimationFrame(() =>
+                                details.scrollIntoView({
+                                    block: "nearest",
+                                    behavior: reduced ? "auto" : "smooth"
+                                })
+                            );
+                    }
+                },
+                nextAction
             );
+        const setNext = (next: NavAction) => {
+            nextAction = next;
+            renderNav();
+        };
+        const lockNav = () =>
+            setNext({ label: "Next", onClick: () => {}, disabled: true });
         lockNav();
 
         // What really happened, step by step. On a fast device the whole build
@@ -498,6 +515,10 @@ export function startOnboarding(
             install: 4,
             bundle: 3.5
         };
+        // A download or an install that shows no sign of life for this long
+        // (a dropped connection) fails with Try again instead of hanging.
+        // The bundle has its own timeout (build.ts).
+        const STALL_SECONDS = 90;
         type Real = {
             started: boolean;
             snapshots: StepProgress[];
@@ -515,12 +536,15 @@ export function startOnboarding(
         let failure: { step: StepId; message: string } | null = null;
         let targetDir = `/${cloneDir}`;
         let logText = "";
+        let lastActivity = performance.now();
+        const alive = () => (lastActivity = performance.now());
 
         let shown = 0;
         let shownFraction = 0;
         let shownSince = performance.now();
         let shownLogs = 0;
         let last = performance.now();
+        let waiting = false;
         const feedLines: string[] = [];
 
         const feedTo = (id: StepId, count: number) => {
@@ -554,6 +578,13 @@ export function startOnboarding(
                         "registry.npmjs.org"
                     )
                 );
+            if (id === "bundle")
+                // the files esbuild bundles: the engine and the screen in
+                // one, for the curious, in the details
+                findExcerpt(targetDir).then((excerpt) => {
+                    if (excerpt && current())
+                        codeSlot.replaceChildren(codeCard(excerpt));
+                });
             if (!world) return;
             if (id === "install") {
                 // pull back to see every package land
@@ -565,13 +596,6 @@ export function startOnboarding(
                 world.animate("uLabels", 0, 0.4);
                 world.animate("uFrame", 0.72, 2.2);
                 world.animate("uElev", 0.22, 2.2);
-                // the files esbuild bundles: the engine and the screen in one
-                findExcerpt(targetDir).then((excerpt) => {
-                    if (excerpt && current()) {
-                        extra.replaceChildren(codeCard(excerpt));
-                        requestAnimationFrame(frameWorld);
-                    }
-                });
             }
         };
 
@@ -588,10 +612,13 @@ export function startOnboarding(
             if (id === "bundle") world.follow("uCore", fraction);
         };
 
-        const ignite = (report: BuildReport) => {
+        // 4. Run: the core bursts into the world, the project is alive
+        let ran = false;
+        const runStep = (report: BuildReport) => {
+            if (ran || !current()) return;
+            ran = true;
             built = report;
             chip.replaceChildren();
-            extra.replaceChildren();
             say("running", WORDS.running);
             if (world) {
                 // the core bursts into the world; the camera is thrown back by
@@ -609,77 +636,82 @@ export function startOnboarding(
                 world.animate("uAzim", world.get("uAzim") + 0.8, 4.8);
             }
             flash();
-            setNav(
-                step,
-                { label: "Back", onClick: welcome },
-                { label: "Next", onClick: () => ready(report) }
-            );
+            lockNav();
+            const fill = segments.get("run").fill;
+            const seconds = reduced ? 1 : 3.2;
+            const start = performance.now();
+            const tick = (t: number) => {
+                if (!current()) return;
+                const f = Math.min(1, (t - start) / 1000 / seconds);
+                fill.style.width = `${Math.round(f * 100)}%`;
+                if (f < 1) {
+                    requestAnimationFrame(tick);
+                    return;
+                }
+                setNext({ label: "Next", onClick: () => ready(report) });
+            };
+            requestAnimationFrame(tick);
         };
 
         // a step is done on screen: wait for Next before the following one
-        let waiting = false;
         const stepDone = () => {
             waiting = true;
-            setNav(
-                step,
-                { label: "Back", onClick: welcome, disabled: true },
-                {
-                    label: "Next",
-                    onClick: () => {
-                        if (!waiting || !current()) return;
-                        waiting = false;
-                        shown++;
-                        shownFraction = 0;
-                        shownLogs = 0;
-                        if (shown === STEPS.length) {
-                            // the build may still be writing its report;
-                            // its .then ignites then
-                            if (report) ignite(report);
-                            else lockNav();
-                            return;
-                        }
-                        lockNav();
-                        last = performance.now();
-                        requestAnimationFrame(play);
+            setNext({
+                label: "Next",
+                onClick: () => {
+                    if (!waiting || !current()) return;
+                    waiting = false;
+                    shown++;
+                    shownFraction = 0;
+                    shownLogs = 0;
+                    lockNav();
+                    if (shown === STEPS.length) {
+                        // the build may still be writing its report: its
+                        // .then runs the last step then
+                        if (report) runStep(report);
+                        return;
                     }
+                    last = performance.now();
+                    requestAnimationFrame(play);
                 }
-            );
+            });
         };
 
         const play = (now: number) => {
-            if (!current()) return;
+            if (!current() || waiting) return;
             const dt = Math.min(0.1, (now - last) / 1000);
             last = now;
             const id = STEPS[shown]?.id;
             if (!id) return;
             const r = real[id];
+            if (failure && failure.step === id && !r.done) {
+                failed(failure.step, failure.message);
+                return;
+            }
             if (!r.started) {
                 requestAnimationFrame(play);
                 return;
             }
             if (shownCopy !== id) startStep(id);
 
+            // Never frozen: while a step runs, time alone moves its bar
+            // toward 90 % (slower and slower); real progress, when the step
+            // reports it, moves it faster. Only the real end completes it.
             const measured = r.snapshots.filter(
                 (s) => s.fraction !== undefined
             );
-            // esbuild gives no progress: its bar moves with time, and waits
-            // for the real end before it completes
-            const target = r.done
-                ? 1
-                : measured.length
-                  ? (measured.at(-1)?.fraction ?? 0)
-                  : Math.min(0.9, (now - shownSince) / 1000 / MIN_SECONDS[id]);
-            shownFraction = Math.min(
-                target,
-                shownFraction + dt / MIN_SECONDS[id]
+            const reported = measured.at(-1)?.fraction ?? 0;
+            const elapsed = (now - shownSince) / 1000;
+            const creep =
+                0.9 * (1 - Math.exp(-elapsed / (MIN_SECONDS[id] * 2)));
+            const target = r.done ? 1 : Math.max(reported, creep);
+            shownFraction = Math.max(
+                shownFraction,
+                Math.min(target, shownFraction + dt / MIN_SECONDS[id])
             );
             follow(id, shownFraction);
             feedTo(id, Math.ceil(r.logs.length * (r.done ? shownFraction : 1)));
 
-            if (failure && failure.step === id && !r.done) {
-                failed(failure.step, failure.message);
-                return;
-            }
             if (r.done && shownFraction >= 1) {
                 feedTo(id, r.logs.length);
                 stepDone();
@@ -690,12 +722,14 @@ export function startOnboarding(
         requestAnimationFrame(play);
 
         const failed = (failedStep: StepId, message: string) => {
+            if (!current()) return;
+            clearInterval(watchdog);
             say(`failed-${failedStep}`, {
                 name: WORDS.steps[failedStep].name,
                 big: "That didn't work.",
                 small: failureSentence(failedStep, message)
             });
-            details.open = true;
+            setDetails(true);
             errorSlot.replaceChildren(
                 button(continueLabel, () =>
                     finish({
@@ -704,12 +738,33 @@ export function startOnboarding(
                     })
                 )
             );
-            setNav(
-                step,
-                { label: "Back", onClick: welcome },
-                { label: "Try again", onClick: build }
-            );
+            setNext({ label: "Try again", onClick: build });
         };
+
+        // shown when the replay reaches the failed step
+        const fail = (failedStep: StepId, message: string) => {
+            if (failure || !current()) return;
+            real[failedStep].started = true;
+            failure = { step: failedStep, message };
+            if (
+                !waiting &&
+                shown === STEPS.findIndex((s) => s.id === failedStep)
+            )
+                failed(failedStep, message);
+        };
+
+        const watchdog = setInterval(() => {
+            if (!current() || report || failure) {
+                clearInterval(watchdog);
+                return;
+            }
+            if (realStep === "bundle" || real[realStep].done) return;
+            if ((performance.now() - lastActivity) / 1000 < STALL_SECONDS)
+                return;
+            logText += `No progress for ${STALL_SECONDS} seconds\n`;
+            logEl.textContent = logText;
+            fail(realStep, `no progress for ${STALL_SECONDS} seconds`);
+        }, 2000);
 
         buildDemo(cloneDir, {
             onTarget(dir) {
@@ -717,40 +772,40 @@ export function startOnboarding(
             },
             onStep(id) {
                 if (!current()) return;
+                alive();
                 realStep = id;
                 real[id].started = true;
             },
             onProgress(id, p) {
-                if (current()) real[id].snapshots.push({ ...p });
+                if (!current()) return;
+                alive();
+                real[id].snapshots.push({ ...p });
             },
             onStepDone(id) {
-                if (current()) real[id].done = true;
+                if (!current()) return;
+                alive();
+                real[id].done = true;
             },
             onLog(line) {
                 if (!current()) return;
+                alive();
                 logText += line + "\n";
                 logEl.textContent = logText;
                 real[realStep].logs.push(line);
             }
         })
             .then((result) => {
-                if (!current()) return;
+                if (!current() || failure) return;
                 report = result;
-                // the replay may be done already
-                if (shown === STEPS.length) ignite(result);
+                // Next may have been clicked already, waiting for this
+                if (shown === STEPS.length) runStep(result);
             })
             .catch((e) => {
                 if (!current()) return;
-                const failedStep: StepId =
-                    e instanceof StepError ? e.step : "download";
-                const message =
-                    e instanceof StepError
-                        ? e.message
-                        : String(e?.message ?? e);
-                real[failedStep].started = true;
-                failure = { step: failedStep, message };
-                if (shown >= STEPS.findIndex((s) => s.id === failedStep))
-                    failed(failedStep, message);
+                fail(
+                    e instanceof StepError ? e.step : "download",
+                    e instanceof StepError ? e.message : String(e?.message ?? e)
+                );
             });
     }
 
@@ -783,8 +838,8 @@ export function startOnboarding(
             }
         };
 
-        const step = show("ready", [
-            h("h1", { class: "fso-in" }, "Your demo project is ready"),
+        show("ready", [
+            h("h1", { class: "fso-in" }, "The demo project is ready"),
             h(
                 "button",
                 {
@@ -797,27 +852,16 @@ export function startOnboarding(
                     "span",
                     { class: "fso-open-demo-text" },
                     h("strong", null, "Explore the demo"),
-                    h(
-                        "span",
-                        null,
-                        "See what's inside, then rebuild it offline."
-                    )
+                    h("span", null, "See what's inside.")
                 )
             ),
-            note,
-            h(
-                "div",
-                { class: "fso-actions fso-in-late" },
-                button(
-                    [icon("file"), "View the source"],
-                    () => source(report, `/${report.directory}`),
-                    "text"
-                )
-            )
+            note
         ]);
         setNav(
-            step,
-            { label: "Back", onClick: welcome },
+            {
+                label: [icon("file"), h("span", null, "View the source")],
+                onClick: () => source(report, `/${report.directory}`)
+            },
             {
                 label: continueLabel,
                 onClick: () => finish({ outcome: "built", report })
@@ -825,20 +869,17 @@ export function startOnboarding(
         );
     }
 
-    // View source: the downloaded files, read-only
+    // View source: the downloaded files, read-only. The bar's ‹ goes up a
+    // folder (from the top, back to the ready screen); Done goes back.
     async function source(report: BuildReport, dir: string) {
         const rootDir = `/${report.directory}`;
-        const back = () =>
+        const up = () =>
             dir === rootDir
                 ? ready(report)
                 : source(report, dir.slice(0, dir.lastIndexOf("/")));
         const list = h("ul", { class: "fso-files" });
-        const step = show("source", [sourceBar(dir.slice(1) + "/"), list]);
-        setNav(
-            step,
-            { label: "Back", onClick: back },
-            { label: "Done", onClick: () => ready(report) }
-        );
+        show("source", [sourceBar(dir.slice(1) + "/", up), list]);
+        setNav(null, { label: "Done", onClick: () => ready(report) });
         try {
             for (const entry of await listDirectory(dir)) {
                 list.append(
@@ -874,15 +915,11 @@ export function startOnboarding(
     async function file(report: BuildReport, path: string) {
         const parent = path.slice(0, path.lastIndexOf("/"));
         const content = h("pre", null, "Loading…");
-        const step = show("source", [
-            sourceBar(path.slice(1)),
+        show("source", [
+            sourceBar(path.slice(1), () => source(report, parent)),
             h("div", { class: "fso-file-view" }, content)
         ]);
-        setNav(
-            step,
-            { label: "Back", onClick: () => source(report, parent) },
-            { label: "Done", onClick: () => ready(report) }
-        );
+        setNav(null, { label: "Done", onClick: () => ready(report) });
         try {
             const preview = await readPreview(path);
             content.textContent =
@@ -896,11 +933,20 @@ export function startOnboarding(
         }
     }
 
-    function sourceBar(title: string) {
+    function sourceBar(title: string, up: () => void) {
         return h(
             "div",
             { class: "fso-source-bar" },
-            icon("folder"),
+            h(
+                "button",
+                {
+                    type: "button",
+                    class: "fso-source-up",
+                    "aria-label": "Up",
+                    onclick: up
+                },
+                icon("back")
+            ),
             h("span", { class: "fso-source-path" }, title)
         );
     }

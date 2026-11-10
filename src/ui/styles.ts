@@ -39,7 +39,8 @@ export const css = `
 .fso :focus-visible { outline: 2px solid var(--fso-world); outline-offset: 2px; }
 
 /* the stage: backdrop, the world, the vignette, the labels, the flash */
-.fso-stage { position: absolute; inset: 0; pointer-events: none; }
+.fso-stage { position: absolute; inset: 0; pointer-events: none; overflow: hidden; transition: opacity 0.5s ease; }
+.fso-reading .fso-stage { opacity: 0.18; }
 .fso-stage > * { position: absolute; inset: 0; }
 .fso-canvas { width: 100%; height: 100%; display: block; }
 .fso-backdrop {
@@ -102,13 +103,16 @@ export const css = `
     padding: env(safe-area-inset-top) max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));
     flex-shrink: 0;
 }
-.fso-brand { display: inline-flex; width: 22px; height: 26px; color: var(--fso-text); opacity: 0.45; }
-.fso-brand svg { width: 100%; height: 100%; }
+.fso-brand { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; margin-left: -11px; color: var(--fso-text); opacity: 0.45; -webkit-tap-highlight-color: transparent; }
+.fso-brand:hover { opacity: 0.7; }
+.fso-brand svg { width: 22px; height: 26px; }
 
 .fso-scroll {
     position: relative;
     flex: 1;
+    overflow-x: hidden;
     overflow-y: auto;
+    touch-action: pan-y;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
 }
@@ -116,6 +120,7 @@ export const css = `
     display: flex;
     flex-direction: column;
     min-height: 100%;
+    min-width: 0;
     max-width: 560px;
     margin: 0 auto;
     padding: 0 max(16px, env(safe-area-inset-right)) 8px max(16px, env(safe-area-inset-left));
@@ -124,7 +129,7 @@ export const css = `
 .fso-sky { position: relative; flex: 1 0 34vh; min-height: 160px; }
 .fso-main[data-screen="source"] .fso-sky { flex: 0 0 0; min-height: 0; }
 .fso-main[data-screen="source"] { background: rgb(2 4 10 / 0.86); }
-.fso-words { position: relative; text-shadow: 0 1px 2px rgb(0 0 0 / 0.5), 0 0 28px rgb(0 0 0 / 0.6); }
+.fso-words { position: relative; min-width: 0; overflow-wrap: break-word; text-shadow: 0 1px 2px rgb(0 0 0 / 0.5), 0 0 28px rgb(0 0 0 / 0.6); }
 
 .fso h1 {
     font-size: 30px;
@@ -202,15 +207,8 @@ export const css = `
 .fso-notice .fso-icon { color: var(--fso-muted); flex-shrink: 0; }
 .fso-notice p { margin: 0; }
 
-.fso-details { margin: 8px 0 0; text-shadow: none; }
-.fso-details summary {
-    min-height: 44px;
-    display: inline-flex;
-    align-items: center;
-    cursor: pointer;
-    color: var(--fso-muted);
-    font-size: 14px;
-}
+.fso-details { margin: 4px 0 0; text-shadow: none; min-width: 0; animation: fso-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.fso-details[hidden] { display: none; }
 .fso-feed {
     list-style: none;
     margin: 0 0 8px;
@@ -336,19 +334,22 @@ export const css = `
     align-items: center;
     gap: 12px;
     width: 100%;
-    max-width: 560px;
+    max-width: 680px;
     margin: 0 auto;
-    padding: 10px max(16px, env(safe-area-inset-right)) 4px max(16px, env(safe-area-inset-left));
+    padding: 10px max(16px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
     flex-shrink: 0;
 }
 .fso-nav .fso-button { min-height: 52px; padding: 10px 18px; font-size: 17px; white-space: nowrap; flex-shrink: 0; }
-.fso-nav-step { flex: 1; text-align: center; font-family: var(--fso-mono); font-size: 13px; color: var(--fso-dim); font-variant-numeric: tabular-nums; }
+.fso-nav-spacer { flex: 1; }
+.fso-nav .fso-nav-side { min-width: 0; flex-shrink: 1; }
+.fso-nav-side span { overflow: hidden; text-overflow: ellipsis; }
 
 .fso-icon { display: inline-flex; width: 24px; height: 24px; }
 .fso-icon svg { width: 100%; height: 100%; }
 
 .fso-source-bar { display: flex; align-items: center; gap: 8px; margin: 12px 0 8px; }
-.fso-source-bar .fso-icon { color: var(--fso-muted); }
+.fso-source-up { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-left: -10px; flex-shrink: 0; border: 0; background: transparent; color: var(--fso-text); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.fso-source-up .fso-icon { color: inherit; }
 .fso-source-path { font-family: var(--fso-mono); font-size: 14px; overflow-wrap: anywhere; }
 .fso-files { list-style: none; margin: 0 0 16px; padding: 0; border: 1px solid var(--fso-line); border-radius: var(--fso-radius); background: var(--fso-card); overflow: hidden; }
 .fso-files li + li { border-top: 1px solid var(--fso-line); }
@@ -371,19 +372,12 @@ export const css = `
 .fso-files .fso-icon { color: var(--fso-muted); width: 20px; height: 20px; flex-shrink: 0; }
 .fso-file-view pre { max-height: none; }
 
-.fso-footer {
-    position: relative;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 0 4px;
-    padding: 0 max(16px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
-    font-size: 13px;
-    flex-shrink: 0;
+/* the smallest phones: both nav buttons fit, without the icon */
+@media (max-width: 359px) {
+    .fso-nav { gap: 8px; }
+    .fso-nav .fso-button { padding: 10px 14px; font-size: 15px; }
+    .fso-nav-side .fso-icon { display: none; }
 }
-.fso-footer a { display: inline-flex; align-items: center; min-height: 40px; padding: 0 8px; color: var(--fso-dim); text-decoration: none; }
-.fso-footer a:hover { text-decoration: underline; }
-
 @media (min-width: 640px) {
     .fso h1 { font-size: 38px; }
     .fso-big { font-size: 30px; }
