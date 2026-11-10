@@ -976,13 +976,13 @@ export function startOnboarding(
                     class: "fso-open-demo fso-in-late",
                     onclick: openDemo
                 },
-                icon("external"),
                 h(
                     "span",
                     { class: "fso-open-demo-text" },
                     h("strong", null, "Explore the demo"),
                     h("span", null, "See what's inside.")
-                )
+                ),
+                icon("external")
             ),
             note,
             // the build's record, folded: Show details

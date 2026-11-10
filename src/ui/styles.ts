@@ -320,17 +320,26 @@ export const css = `
 .fso-button .fso-icon { width: 20px; height: 20px; flex-shrink: 0; }
 .fso-header .fso-button { min-height: 44px; color: var(--fso-muted); }
 
+/* a side action, in the tone of Show details: Finish stays the one blue */
 .fso-open-demo {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 14px;
     width: 100%;
-    margin: 6px 0 10px;
-    padding: 16px 18px;
-    border: 0;
-    border-radius: var(--fso-radius);
-    background: var(--fso-world);
-    color: var(--fso-accent-text);
+    /* grouped, not evened out: the capsule is the headline's action, so it
+       sits close under it (~22 px from the baseline; the h1's margin
+       collapses into this one), and the button row, the same bar on every
+       screen, stands apart (~34 px: 16 + 8 for .fso-main + 10 for
+       .fso-nav) */
+    margin: 16px 0 16px;
+    padding: 14px 22px 14px 24px;
+    border: 1px solid var(--fso-line);
+    border-radius: 999px;
+    background: rgb(255 255 255 / 0.06);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    color: var(--fso-text);
     font: inherit;
     text-align: left;
     cursor: pointer;
@@ -338,10 +347,10 @@ export const css = `
     -webkit-tap-highlight-color: transparent;
     text-shadow: none;
 }
-.fso-open-demo .fso-icon { width: 28px; height: 28px; flex-shrink: 0; }
-.fso-open-demo-text { display: flex; flex-direction: column; gap: 2px; }
+.fso-open-demo .fso-icon { width: 22px; height: 22px; flex-shrink: 0; color: color-mix(in srgb, var(--fso-world) 70%, white); }
+.fso-open-demo-text { display: flex; flex-direction: column; gap: 1px; }
 .fso-open-demo strong { font-size: 18px; }
-.fso-open-demo-text span { font-size: 14px; opacity: 0.92; }
+.fso-open-demo-text span { font-size: 14px; color: var(--fso-muted); }
 
 .fso-nav {
     position: relative;
@@ -371,6 +380,7 @@ export const css = `
 }
 @media (min-width: 640px) {
     .fso h1 { font-size: 38px; }
+    .fso-open-demo { margin-top: 13px; } /* the larger h1 ends further below its baseline */
     .fso-big { font-size: 30px; }
 }
 @media (prefers-reduced-motion: reduce) {
