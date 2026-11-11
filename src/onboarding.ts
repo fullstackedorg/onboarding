@@ -15,6 +15,7 @@ import { formatBytes } from "./format";
 import { button, h, icon, type Child } from "./ui/dom";
 import { css, PAGE_COLOR } from "./ui/styles";
 import { createWorld, type World } from "./world/world";
+import { startSplash } from "./splash";
 
 export const ONBOARDING_CONFIG_KEY = "onboarding";
 
@@ -186,19 +187,15 @@ export function startOnboarding(
     );
 
     const skip = button("Skip", () => finish({ outcome: "skipped" }), "text");
-    const header = h(
-        "header",
-        { class: "fso-header" },
-        h("a", {
-            class: "fso-brand",
-            href: SITE,
-            target: "_blank",
-            rel: "noopener",
-            "aria-label": "FullStacked (fullstacked.org)",
-            html: LOGO
-        }),
-        skip
-    );
+    const brand = h("a", {
+        class: "fso-brand",
+        href: SITE,
+        target: "_blank",
+        rel: "noopener",
+        "aria-label": "FullStacked (fullstacked.org)",
+        html: LOGO
+    });
+    const header = h("header", { class: "fso-header" }, brand, skip);
     // the world fills the space above the words
     const sky = h("div", { class: "fso-sky" });
     const words = h("div", { class: "fso-words" });
@@ -230,19 +227,40 @@ export function startOnboarding(
         clusters: DEMO_PACKAGES,
         projectName: "demo",
         color: WORLD_COLOR,
-        reducedMotion: reduced
+        reducedMotion: reduced,
+        // a device that can't hold the frame rate drops the page's costly
+        // effects (blurs) too
+        onQuality: (_, lite) => root.classList.toggle("fso-lite", lite)
     });
     // the welcome: the FullStacked world, turning; the build rewinds it and
-    // makes it again, for real
+    // makes it again, for real. Behind the splash it draws hidden, fully lit,
+    // until the frame rate settles; then it fades in from far away.
     if (world) {
-        world.animate("uIntro", 1, 1.6);
-        for (const c of ["uStream", "uPkg", "uCore", "uWorld"] as const)
+        for (const c of [
+            "uIntro",
+            "uStream",
+            "uPkg",
+            "uCore",
+            "uWorld"
+        ] as const)
             world.set(c, 1);
         world.set("uFrame", 3.2);
         world.set("uElev", 0.5);
-        world.animate("uFrame", 2.3, 4, { ease: "out" });
-        world.animate("uElev", 0.32, 4, { ease: "out" });
     }
+    const splash = startSplash({
+        root,
+        logo: LOGO,
+        brand,
+        ready: world ? world.warmup(1.6) : Promise.resolve(),
+        reduced,
+        onReveal: () => {
+            if (!world) return;
+            world.set("uIntro", 0);
+            world.animate("uIntro", 1, 1.8);
+            world.animate("uFrame", 2.3, 4, { ease: "out" });
+            world.animate("uElev", 0.32, 4, { ease: "out" });
+        }
+    });
 
     // frame the world between the header and the words
     const frameWorld = () => {
@@ -373,6 +391,8 @@ export function startOnboarding(
     // button's; a held key doesn't run through the steps.
     const onKey = (e: KeyboardEvent) => {
         if (finished || e.defaultPrevented || e.repeat) return;
+        // nothing to act on until the splash is gone
+        if (root.classList.contains("fso-splash")) return;
         if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
         if (e.key === "ArrowRight" || e.key === "Enter") {
             const target = e.target as Element | null;
@@ -396,6 +416,7 @@ export function startOnboarding(
     function unmount() {
         buildRun++;
         document.removeEventListener("keydown", onKey);
+        splash.cancel();
         ro.disconnect();
         world?.dispose();
         root.remove();
@@ -432,9 +453,27 @@ export function startOnboarding(
         show(
             "welcome",
             [
-                h("h1", { class: "fso-in" }, "Welcome to FullStacked"),
-                h("p", { class: "fso-tagline fso-in" }, WORDS.tagline),
-                h("p", { class: "fso-lead fso-in-late" }, WORDS.what),
+                // word by word, then the tagline and the line
+                h(
+                    "h1",
+                    null,
+                    "Welcome to FullStacked"
+                        .split(" ")
+                        .flatMap((word, i) => [
+                            i ? " " : null,
+                            h(
+                                "span",
+                                { class: "fso-word", style: `--fso-i: ${i}` },
+                                word
+                            )
+                        ])
+                ),
+                h(
+                    "p",
+                    { class: "fso-tagline fso-in fso-after-1" },
+                    WORDS.tagline
+                ),
+                h("p", { class: "fso-lead fso-in fso-after-2" }, WORDS.what),
                 offline
                     ? h(
                           "div",

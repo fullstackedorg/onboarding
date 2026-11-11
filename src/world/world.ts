@@ -17,6 +17,7 @@ import {
     type Mat4,
     type Vec3
 } from "./mat4";
+import { Governor } from "./governor";
 
 export type Cluster = { name: string; bytes: number };
 
@@ -28,6 +29,8 @@ export type WorldOptions = {
     projectName: string;
     color: string;
     reducedMotion: boolean;
+    // the frame-rate governor stepped to another quality (governor.ts)
+    onQuality?: (level: number, lite: boolean) => void;
 };
 
 export type Ease = "linear" | "inOut" | "out";
@@ -124,8 +127,7 @@ export class World {
     private last = performance.now();
     private elapsed = 0;
     private spin = 0;
-    private frameTimes: number[] = [];
-    private degraded = false;
+    private governor: Governor;
     private count: number;
     private drawCount: number;
     private ro: ResizeObserver;
@@ -162,6 +164,15 @@ export class World {
             ((navigator as any).deviceMemory || 8) <= 3;
         this.count = lowEnd ? LOW_END_PARTICLES : MAX_PARTICLES;
         this.drawCount = this.count;
+        this.governor = new Governor((level) => {
+            const q = this.governor.quality;
+            this.drawCount = Math.floor(this.count * q.particles);
+            this.resize();
+            console.debug(
+                `onboarding: quality ${level} at ${Math.round(this.governor.fps)} fps`
+            );
+            this.opts.onQuality?.(level, q.lite);
+        });
 
         this.program = this.compile();
         this.buildParticles();
@@ -520,16 +531,35 @@ export class World {
     }
 
     stats() {
-        const t = this.frameTimes;
-        const avg = t.length ? t.reduce((a, b) => a + b, 0) / t.length : 0;
-        const sorted = [...t].sort((a, b) => a - b);
         return {
-            avgMs: avg,
-            p95Ms: sorted[Math.floor(sorted.length * 0.95)] || 0,
+            fps: Math.round(this.governor.fps),
+            level: this.governor.level,
+            locked: this.governor.locked,
             particles: this.drawCount,
-            pixelRatio: this.pixelRatio,
-            degraded: this.degraded
+            pixelRatio: this.pixelRatio
         };
+    }
+
+    // Draws hidden until the frame rate has settled (the shaders compiled,
+    // the governor done stepping down), or for maxSeconds at most: the
+    // splash waits on it, so the world appears at a rate it can hold.
+    warmup(maxSeconds: number): Promise<void> {
+        const governor = this.governor;
+        governor.warming = true;
+        const until = performance.now() + maxSeconds * 1000;
+        return new Promise((resolve) => {
+            const check = () => {
+                if (
+                    this.disposed ||
+                    governor.settled ||
+                    performance.now() >= until
+                ) {
+                    governor.warming = false;
+                    resolve();
+                } else setTimeout(check, 50);
+            };
+            check();
+        });
     }
 
     // ── Loop ────────────────────────────────────────────────────────────────
@@ -562,7 +592,7 @@ export class World {
         const h = canvas.clientHeight || window.innerHeight;
         this.pixelRatio = Math.min(
             window.devicePixelRatio || 1,
-            this.degraded ? 1 : 1.5
+            this.governor.quality.pixelRatio
         );
         this.width = w;
         this.height = h;
@@ -702,22 +732,10 @@ export class World {
         });
     }
 
-    // frame times; degrade once if the device can't keep up
+    // frame times go to the governor, which steps the quality down when
+    // the device can't keep up (governor.ts)
     private measure(dtMs: number) {
-        if (dtMs <= 0 || dtMs > 250) return;
-        this.frameTimes.push(dtMs);
-        if (this.frameTimes.length > 120) this.frameTimes.shift();
-        if (
-            !this.degraded &&
-            this.elapsed > 3 &&
-            this.frameTimes.length === 120 &&
-            this.stats().avgMs > 24
-        ) {
-            this.degraded = true;
-            this.drawCount = Math.floor(this.count * 0.6);
-            this.resize();
-            this.frameTimes = [];
-        }
+        this.governor.frame(dtMs);
     }
 
     dispose() {

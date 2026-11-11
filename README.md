@@ -2,9 +2,10 @@
 
 The first-launch experience of the [FullStacked](https://fullstacked.org) app. It shows that FullStacked is a real JavaScript runtime on the device by building the [demo](https://github.com/fullstackedorg/demo) live: `git clone`, `npm install` and an esbuild bundle, with progress, on the device itself. No server, no account.
 
-The whole onboarding plays on a deep navy stage with the FullStacked world, a particle animation (plain WebGL, `src/world/`, no dependency). While it is up, it paints the page (`<html>`, `<body>` and `theme-color`) with the stage's top colour, so the status bar the native shells draw from the page matches it; the page gets its own colours back when the onboarding leaves. The words stay short, catchy and non-technical: one line per screen, no exact numbers. The top left shows the FullStacked mark (monochrome, quiet), a link to fullstacked.org. Every screen has the same bar at the bottom: _Show details_ on the left (once the build has started) and _Next →_ on the right. Nothing moves on by itself: each step waits for _Next_, which stays disabled until the step is done; only the run follows the build without one. On a keyboard, → and Enter are _Next_ and Escape is _Skip_.
+The whole onboarding plays on a deep navy stage with the FullStacked world, a particle animation (plain WebGL, `src/world/`, no dependency). The world aims for 60 frames a second: a governor measures the frame rate (never shown) and, when a device can't hold it, draws fewer pixels, then fewer particles, and drops the page's blurs, until it does; a screen capped at 30 Hz (low-power mode) keeps the full picture, since a lighter world wouldn't run faster there. While it is up, it paints the page (`<html>`, `<body>` and `theme-color`) with the stage's top colour, so the status bar the native shells draw from the page matches it; the page gets its own colours back when the onboarding leaves. The words stay short, catchy and non-technical: one line per screen, no exact numbers. The top left shows the FullStacked mark (monochrome, quiet), a link to fullstacked.org. Every screen has the same bar at the bottom: _Show details_ on the left (once the build has started) and _Next →_ on the right. Nothing moves on by itself: each step waits for _Next_, which stays disabled until the step is done; only the run follows the build without one. On a keyboard, → and Enter are _Next_ and Escape is _Skip_.
 
-1. **Welcome**: the world turning, _Welcome to FullStacked_, the tagline from fullstacked.org (_Build anything. Run it everywhere._) and one line (_Whole projects, built and running right here. No server needed._). _Run the demo →_ or _Skip_.
+0. **Splash**: the first paint is the FullStacked mark alone, fading in slowly while everything loads hidden behind it (the world draws its first frames until the frame rate settles, the fonts load). Then the mark moves onto the top left one and, after a short pause, the world and the words come in together (`src/splash.ts`). Only the onboarding has a splash: once it is done, the app opens straight on its terminal.
+1. **Welcome**: the world turning, _Welcome to FullStacked_ word by word, the tagline from fullstacked.org (_Build anything. Run it everywhere._) and one line (_Whole projects, built and running right here. No server needed._). _Run the demo →_ or _Skip_.
 2. **Live build**: the world flies apart, then the real build makes it again. Clone the demo project from GitHub and check out the pinned commit (git objects stream in from the top left), install its packages (one cluster per package, labelled, from the top right), bundle it with the Tailwind CSS plugin (everything spirals into a core, with real lines of the project where the engine — Node.js — and the screen — the browser — meet in one file, `src/excerpt.ts`), then the core ignites into the world: the project runs. One short, non-technical line per step (_Gathering everything it needs to run._) and a thin three-part bar (download, install, build); the run follows the build on its own, then _Next_ goes on. _Show details_ unfolds a record of everything that happened so far, one section per step as it plays (its output, a check and a summary once done, the project's own lines under Build), kept for the whole build. On a fast device the build takes a second: the world replays what was recorded at a pace the eye can follow (each step at least 3 s, 4 s and 3.5 s), in the real order. A bar never stands still: while a step runs, time moves it toward 90 %, real progress faster, and only the real end completes it. A download or install with no sign of life for 90 s fails with _Try again_ instead of hanging.
 3. **Ready**: _The demo project is ready_, a large _Explore the demo ↗_ capsule, in the grey of _Show details_ (it opens the demo project in a new window), _Show details_ (the build's record, still there) and _Finish →_. The demo project has its own file browser, so the onboarding shows no files. Before that, the build's numbers are written to `<demo>/user_data/build.json` for the demo project.
 4. **Hand-over**: the config key `onboarding` is set to `"1"` and `onDone(stats)` is called.
@@ -27,20 +28,22 @@ npm start
 
 ## Layout
 
-| Path                  | What                                                                                    |
-| --------------------- | --------------------------------------------------------------------------------------- |
-| `src/index.ts`        | The API: `startOnboarding`, `shouldRunOnboarding`, `markOnboardingDone`                 |
-| `src/onboarding.ts`   | The screens                                                                             |
-| `src/excerpt.ts`      | The lines shown while esbuild runs: Node.js and browser APIs in one file of the project |
-| `src/world/`          | The particle world, plain WebGL: formations, camera, labels (ported from the demo)      |
-| `src/build.ts`        | The live build: clone, install, bundle, `build.json`                                    |
-| `src/ui/`             | A small DOM helper, icons and the stylesheet (no UI framework, so it stays light)       |
-| `src/demo-pin.ts`     | Generated by `npm run pin-demo`: the demo's repository, pinned commit and download size |
-| `src/shell.ts`        | The startup the build plugin adds to the app's shell: onboarding, then the terminal     |
-| `index.ts`            | The build plugin (`fullstacked --build -p <this repository> shell`)                     |
-| `dev/index.ts`        | The standalone development page (`npm start`)                                           |
-| `vendor/demo`         | The demo, as a git submodule at the pinned commit                                       |
-| `scripts/pin-demo.ts` | Updates the pin                                                                         |
+| Path                    | What                                                                                    |
+| ----------------------- | --------------------------------------------------------------------------------------- |
+| `src/index.ts`          | The API: `startOnboarding`, `shouldRunOnboarding`, `markOnboardingDone`                 |
+| `src/onboarding.ts`     | The screens                                                                             |
+| `src/excerpt.ts`        | The lines shown while esbuild runs: Node.js and browser APIs in one file of the project |
+| `src/world/`            | The particle world, plain WebGL: formations, camera, labels (ported from the demo)      |
+| `src/world/governor.ts` | The frame-rate governor: aims for 60 fps, steps the quality down when it can't hold it  |
+| `src/splash.ts`         | The splash: the mark fading in while everything loads, then its move to the top left    |
+| `src/build.ts`          | The live build: clone, install, bundle, `build.json`                                    |
+| `src/ui/`               | A small DOM helper, icons and the stylesheet (no UI framework, so it stays light)       |
+| `src/demo-pin.ts`       | Generated by `npm run pin-demo`: the demo's repository, pinned commit and download size |
+| `src/shell.ts`          | The startup the build plugin adds to the app's shell: onboarding, then the terminal     |
+| `index.ts`              | The build plugin (`fullstacked --build -p <this repository> shell`)                     |
+| `dev/index.ts`          | The standalone development page (`npm start`)                                           |
+| `vendor/demo`           | The demo, as a git submodule at the pinned commit                                       |
+| `scripts/pin-demo.ts`   | Updates the pin                                                                         |
 
 ## API
 

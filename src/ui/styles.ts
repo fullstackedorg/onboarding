@@ -208,6 +208,42 @@ export const css = `
 .fso-in { animation: fso-in 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 .fso-in-late { animation: fso-in 0.9s 0.25s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 @keyframes fso-in { from { opacity: 0; transform: translateY(12px); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
+/* the welcome's heading, word by word, then its lines */
+.fso-word { display: inline-block; animation: fso-word 1s calc(var(--fso-i, 0) * 0.09s) cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes fso-word { from { opacity: 0; transform: translateY(0.4em); filter: blur(10px); } to { opacity: 1; transform: none; filter: none; } }
+.fso-after-1 { animation-delay: 0.35s; }
+.fso-after-2 { animation-delay: 0.55s; }
+
+/* the splash (splash.ts): the mark alone in the middle, fading in slowly
+   while everything loads hidden; then it moves onto the header's mark
+   (55 x 65 is 2.5 times its 22 x 26) */
+.fso-splash-mark {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    z-index: 3;
+    width: 55px;
+    height: 65px;
+    margin: -32.5px 0 0 -27.5px;
+    color: var(--fso-text);
+    transform-origin: 0 0;
+    pointer-events: none;
+    animation: fso-fade 1.6s ease-in-out backwards;
+    transition: transform 0.9s cubic-bezier(0.65, 0, 0.35, 1), opacity 0.9s cubic-bezier(0.65, 0, 0.35, 1);
+}
+.fso-splash-mark svg { display: block; width: 100%; height: 100%; }
+.fso-splash-leave { opacity: 0.45; }
+.fso-canvas, .fso-labels { transition: opacity 1.2s ease; }
+.fso-splash .fso-canvas, .fso-splash .fso-labels { opacity: 0; transition: none; }
+.fso-splash:not(.fso-landed) .fso-brand { opacity: 0; }
+.fso-header .fso-button, .fso-nav { transition: opacity 0.6s ease 0.6s; }
+.fso-splash .fso-header .fso-button, .fso-splash .fso-nav { opacity: 0; pointer-events: none; transition: none; }
+.fso-splash .fso-words, .fso-splash .fso-words * { animation-play-state: paused !important; }
+
+/* a device that can't hold the frame rate (world/governor.ts): no blurs */
+.fso-lite *, .fso-lite *::before { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+.fso-lite .fso-in, .fso-lite .fso-in-late, .fso-lite .fso-word, .fso-lite .fso-details, .fso-lite .fso-chip { animation-name: fso-rise; }
+@keyframes fso-rise { from { opacity: 0; transform: translateY(12px); } }
 
 .fso-notice {
     display: flex;
@@ -388,7 +424,9 @@ export const css = `
     .fso-big { font-size: 30px; }
 }
 @media (prefers-reduced-motion: reduce) {
-    .fso-in, .fso-in-late, .fso-chip { animation: fso-fade 0.3s ease-out both; }
+    .fso-in, .fso-in-late, .fso-chip, .fso-word { animation: fso-fade 0.3s ease-out both; }
+    .fso-splash-mark { transition: opacity 0.4s ease; }
+    .fso-splash-leave { opacity: 0; }
     .fso-chip i { animation: none; }
     .fso.fso-settled { transition: none; }
 }
