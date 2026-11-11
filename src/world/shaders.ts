@@ -29,6 +29,8 @@ uniform float uPkg;       // 2. packages arrive, everything clusters
 uniform float uCore;      // 3. clusters compress into the core
 uniform float uWorld;     // 4. the core ignites into the world
 uniform float uIgnite;    // flash
+uniform float uLeave;     // 1 while the world comes apart (an even ease, no burst)
+uniform float uSpin;      // the world's turn on itself, in radians (the stars turn with it)
 uniform float uSize;
 uniform float uViewport;
 uniform float uStill;     // reduced motion: nothing moves on its own
@@ -59,7 +61,7 @@ vec3 bezier(vec3 a, vec3 b, vec3 c, float t) {
 
 // the FullStacked world: a planet of points, a ring that orbits it, and a
 // few moons on tilted orbits
-vec3 worldPosition(vec4 w, float t, out vec3 normal) {
+vec3 worldShape(vec4 w, float t, out vec3 normal) {
     if (w.w < 0.5) {
         normal = normalize(w.xyz);
         return w.xyz;
@@ -80,6 +82,14 @@ vec3 worldPosition(vec4 w, float t, out vec3 normal) {
     normal = normalize(p);
     return p;
 }
+// turned on itself: only the world turns, the build's shapes always face
+// the camera, so nothing has to unwind when the world comes apart
+vec3 worldPosition(vec4 w, float t, out vec3 normal) {
+    vec3 p = worldShape(w, t, normal);
+    p.xz = rot(uSpin) * p.xz;
+    normal.xz = rot(uSpin) * normal.xz;
+    return p;
+}
 
 void main() {
     float kind = aMeta.x;
@@ -90,7 +100,9 @@ void main() {
 
     // the stars: far away, they only twinkle
     if (kind > 1.5 && kind < 2.5) {
-        vec4 mv = modelViewMatrix * vec4(aFrom, 1.0);
+        vec3 star = aFrom;
+        star.xz = rot(uSpin) * star.xz;
+        vec4 mv = modelViewMatrix * vec4(star, 1.0);
         float twinkle = 0.55 + 0.45 * sin(t * (0.6 + seed * 1.8) + seed * 50.0);
         vColor = mix(vec3(0.75, 0.82, 1.0), mix(uColor, vec3(1.0), 0.5), step(0.8, tint));
         vAlpha = uIntro * twinkle * (0.25 + 0.75 * tint) * (1.0 - 0.6 * uIgnite);
@@ -101,7 +113,8 @@ void main() {
 
     float k = inOut(stagger(uCore, fract(seed * 3.7), 0.7));
     float w = stagger(uWorld, fract(seed * 5.3), 0.35);
-    float we = outExpo(w);
+    // a new world bursts out fast; the welcome's comes apart evenly
+    float we = mix(outExpo(w), inOut(w), uLeave);
 
     // the bloom: a few huge, faint sprites in the middle
     if (kind > 2.5) {
@@ -146,10 +159,11 @@ void main() {
     vec3 core = aCore * (1.0 + 0.08 * sin(t * 5.0 + seed * 20.0));
     p = mix(p, mix(q, core, k), k);
 
-    // 4. ignite: burst out, overshoot, settle on the world
+    // 4. ignite: burst out, overshoot, settle on the world; when it comes
+    // apart, it swells a little as it lets go
     vec3 normal;
     vec3 world = worldPosition(aWorld, t, normal);
-    float burst = sin(w * PI) * (1.0 - 0.4 * w);
+    float burst = sin(w * PI) * mix(1.0 - 0.4 * w, 0.35, uLeave);
     world *= 1.0 + 0.9 * burst;
     p = mix(p, world, we);
 
@@ -193,15 +207,18 @@ void main() {
     col = mix(col, vec3(1.0), uIgnite * 0.6);
     vColor = col;
 
-    // hidden until it starts its journey; fades with distance and when it
-    // flies past the camera
+    // hidden until it starts its journey (unless it is on the world: the
+    // welcome's world fades as it comes apart, never all at once); fades
+    // with distance and when it flies past the camera
     float depth = -mv.z;
     float fog = clamp(1.25 - (depth - uCamDist) / (uCamDist * 1.4), 0.25, 1.0);
     float near = smoothstep(0.15, 0.6, depth);
-    vAlpha = smoothstep(0.0, 0.06, a) * mix(0.75, 1.0, tint) * fog * near;
+    float shown = max(smoothstep(0.0, 0.06, a), we);
+    vAlpha = shown * mix(0.75, 1.0, tint) * fog * near;
     vAlpha *= mix(1.0, 0.75 + 0.6 * rim, isSphere * we);
 
-    float size = uSize * (0.6 + tint * 0.9) * (isGit ? 1.7 - 0.6 * c : 1.0);
+    // a git object is bigger in the stream, its cluster size on the world
+    float size = uSize * (0.6 + tint * 0.9) * (isGit ? 1.7 - 0.6 * max(c, we) : 1.0);
     size *= mix(1.0, 0.8, k * (1.0 - we));
     size *= 1.0 + 0.5 * burst + uIgnite;
     gl_PointSize = clamp(size * projectionMatrix[1][1] * 0.5 * uViewport / depth, 1.5, uViewport * 0.06);

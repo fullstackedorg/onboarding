@@ -39,6 +39,10 @@ export type BuildCallbacks = {
     onStepDone(step: StepId, summary: string): void;
     // raw output, for the log
     onLog(line: string): void;
+    // The bundle runs on this page's thread (the plugins compile in it):
+    // resolves when it may start, so it doesn't stutter an animation on
+    // screen. The wait isn't counted in the build's times.
+    beforeBundle?(): Promise<void>;
 };
 
 // Written to <dir>/user_data/build.json for the demo's walkthrough
@@ -525,6 +529,10 @@ export async function buildDemo(
         `${plural(npmStats.count, "package")}${npmStats.downloaded ? "" : ", already installed"}`
     );
 
+    const holdStart = now();
+    await cb.beforeBundle?.();
+    const held = now() - holdStart;
+
     const [bundleStats, tBundle] = await step("bundle", cb, () =>
         bundle(dir, cb)
     );
@@ -549,7 +557,7 @@ export async function buildDemo(
             download: round(tDownload),
             install: round(tInstall),
             bundle: round(tBundle),
-            total: round((now() - start) / 1000)
+            total: round((now() - start - held) / 1000)
         }
     };
 

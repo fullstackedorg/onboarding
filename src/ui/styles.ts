@@ -12,6 +12,10 @@
 export const PAGE_COLOR = "#06101f";
 
 export const css = `
+/* the world's center on the screen, eased between screens like the world's
+   framing (AREA_SECONDS in world/world.ts); set once before it is eased */
+@property --fso-cy { syntax: "<length>"; inherits: true; initial-value: 0px; }
+.fso.fso-settled { transition: --fso-cy 0.9s cubic-bezier(0.65, 0, 0.35, 1); }
 .fso {
     --fso-top: ${PAGE_COLOR};
     --fso-stage: #030914;
@@ -386,6 +390,7 @@ export const css = `
 @media (prefers-reduced-motion: reduce) {
     .fso-in, .fso-in-late, .fso-chip { animation: fso-fade 0.3s ease-out both; }
     .fso-chip i { animation: none; }
+    .fso.fso-settled { transition: none; }
 }
 @keyframes fso-fade { from { opacity: 0; } }
 `;

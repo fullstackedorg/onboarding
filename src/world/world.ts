@@ -14,7 +14,6 @@ import {
     multiply,
     perspective,
     project,
-    rotationY,
     type Mat4,
     type Vec3
 } from "./mat4";
@@ -54,6 +53,7 @@ const CHANNELS = [
     "uCore",
     "uWorld",
     "uIgnite",
+    "uLeave",
     "uLabels",
     // the camera: the radius of the sphere it frames, its elevation and
     // its turn around the world, in radians
@@ -68,6 +68,9 @@ const LOW_END_PARTICLES = 1600;
 const MAX_GIT_PARTICLES = 700;
 const GLOWS = 4;
 const FOV = 50;
+// how long the world takes to follow a new area (as long as --fso-cy's
+// transition in styles.ts)
+export const AREA_SECONDS = 0.9;
 
 // the shader works in linear light, like THREE.Color did
 function linearColor(hex: string): Vec3 {
@@ -102,6 +105,7 @@ export class World {
         uCore: 0,
         uWorld: 0,
         uIgnite: 0,
+        uLeave: 0,
         uLabels: 0,
         uFrame: 1.3,
         uElev: 0.12,
@@ -126,8 +130,15 @@ export class World {
     private pixelRatio = 1;
     private width = 1;
     private height = 1;
-    // the part of the screen the world is framed in, in pixels from the top
+    // the part of the screen the world is framed in, in pixels from the top;
+    // a new one is eased to (the words change size between screens), never
+    // jumped to
     private area = { top: 0, bottom: 0 };
+    private areaMove: {
+        from: { top: number; bottom: number };
+        to: { top: number; bottom: number };
+        start: number;
+    } | null = null;
     private areaHeight = 1;
     private offsetY = 0;
     private viewProjection: Mat4 = new Float32Array(16);
@@ -185,6 +196,7 @@ export class World {
             "uCamDist",
             "uColor",
             "uStill",
+            "uSpin",
             "modelViewMatrix",
             "projectionMatrix"
         ])
@@ -476,10 +488,23 @@ export class World {
         this.values[channel] = value;
     }
 
-    // frame the world between two lines of the screen (above the words)
+    // frame the world between two lines of the screen (above the words):
+    // the first time at once, then eased over AREA_SECONDS, like --fso-cy
     setArea(top: number, bottom: number) {
-        this.area = { top, bottom };
-        this.resize();
+        const to = { top, bottom };
+        const target = this.areaMove?.to ?? this.area;
+        if (to.top === target.top && to.bottom === target.bottom) return;
+        if (!this.area.bottom || this.opts.reducedMotion) {
+            this.areaMove = null;
+            this.area = to;
+            this.frameArea();
+            return;
+        }
+        this.areaMove = {
+            from: { ...this.area },
+            to,
+            start: performance.now()
+        };
     }
 
     // a quick flash: 0 → 1 → 0
@@ -506,6 +531,28 @@ export class World {
 
     // ── Loop ────────────────────────────────────────────────────────────────
 
+    // the projection's shift and the area's share of the height
+    private frameArea() {
+        const h = this.height;
+        const top = this.area.top || 0;
+        const bottom = this.area.bottom || h;
+        this.offsetY = h / 2 - (top + bottom) / 2;
+        this.areaHeight = Math.max(0.2, (bottom - top) / h);
+    }
+
+    private moveArea(now: number) {
+        const move = this.areaMove;
+        if (!move) return;
+        const t = Math.min(1, (now - move.start) / (AREA_SECONDS * 1000));
+        const e = EASES.inOut(t);
+        this.area = {
+            top: move.from.top + (move.to.top - move.from.top) * e,
+            bottom: move.from.bottom + (move.to.bottom - move.from.bottom) * e
+        };
+        if (t >= 1) this.areaMove = null;
+        this.frameArea();
+    }
+
     private resize = () => {
         const canvas = this.opts.canvas;
         const w = canvas.clientWidth || window.innerWidth;
@@ -520,10 +567,7 @@ export class World {
         canvas.height = Math.round(h * this.pixelRatio);
         this.gl.viewport(0, 0, canvas.width, canvas.height);
         // shift the projection so the origin sits in the middle of the area
-        const top = this.area.top || 0;
-        const bottom = this.area.bottom || h;
-        this.offsetY = h / 2 - (top + bottom) / 2;
-        this.areaHeight = Math.max(0.2, (bottom - top) / h);
+        this.frameArea();
     };
 
     private onVisibility = () => {
@@ -557,6 +601,8 @@ export class World {
             }
         }
 
+        this.moveArea(now);
+
         // camera: far enough to frame a sphere of radius uFrame in the area,
         // on any aspect ratio, then turned by uElev and uAzim
         const still = this.opts.reducedMotion;
@@ -577,17 +623,13 @@ export class World {
             Math.cos(azim) * Math.cos(elev) * dist
         ];
 
-        // The world turns once it exists. The build's shapes (the stream,
-        // the clusters, the core) are laid out facing the camera, so the turn
-        // applies only as much as the world exists: when the world comes
-        // apart, the turn unwinds to the front (never edge-on, however long
-        // the welcome lasted), and a new world starts turning from there.
-        const exists = this.values.uWorld;
-        if (exists <= 0) this.spin = 0;
-        else if (!still) this.spin += dt * 0.12 * exists;
-        // never more than half a turn to unwind
-        if (exists >= 1 && Math.abs(this.spin) > Math.PI)
-            this.spin -= Math.sign(this.spin) * 2 * Math.PI;
+        // The world turns on itself while it exists. The turn is the world's
+        // own (uSpin, in the shader): the build's shapes (the stream, the
+        // clusters, the core) always face the camera, so when the world
+        // comes apart nothing has to turn back to the front.
+        if (!still)
+            this.spin =
+                (this.spin + dt * 0.12 * this.values.uWorld) % (2 * Math.PI);
 
         const proj = perspective(
             FOV,
@@ -597,9 +639,7 @@ export class World {
             this.offsetY,
             this.height
         );
-        const view = lookAtOrigin(eye);
-        const model = rotationY(this.spin * exists);
-        const modelView = multiply(view, model);
+        const modelView = lookAtOrigin(eye);
         this.viewProjection = multiply(proj, modelView);
 
         const gl = this.gl;
@@ -610,6 +650,7 @@ export class World {
         gl.uniform1f(u.uViewport, this.height * this.pixelRatio);
         gl.uniform1f(u.uCamDist, dist);
         gl.uniform1f(u.uStill, still ? 1 : 0);
+        gl.uniform1f(u.uSpin, this.spin);
         gl.uniform3fv(u.uColor, this.color);
         gl.uniformMatrix4fv(u.modelViewMatrix, false, modelView);
         gl.uniformMatrix4fv(u.projectionMatrix, false, proj);

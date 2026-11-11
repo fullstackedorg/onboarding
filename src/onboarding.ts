@@ -57,6 +57,9 @@ const LOGO = `<svg viewBox="49 6.5 601 709" aria-hidden="true" fill="currentColo
 // FullStacked's blue: the world, the buttons, the glow
 const WORLD_COLOR = "#219ef2";
 
+// how long the welcome's world takes to come apart when the build starts
+const LEAVE_SECONDS = 2.4;
+
 // The words. One catchy, non-technical line per screen, no exact numbers:
 // whole projects, built and run on this device.
 const WORDS = {
@@ -253,6 +256,9 @@ export function startOnboarding(
             "--fso-cy",
             `${Math.round((top + bottom) / 2)}px`
         );
+        // from now on, a new center is eased to, never jumped to
+        if (!root.classList.contains("fso-settled"))
+            requestAnimationFrame(() => root.classList.add("fso-settled"));
     };
     const ro = new ResizeObserver(frameWorld);
     ro.observe(words);
@@ -481,14 +487,20 @@ export function startOnboarding(
         const runId = ++buildRun;
         const current = () => runId === buildRun && !finished;
 
-        // everything starts over: the world flies apart, then the build
-        // makes it again
+        // everything starts over: the world comes apart, back to where it
+        // came from (GitHub and the npm registry), fading as it goes, while
+        // the download starts streaming in. One continuous move: the
+        // particles still on the world stay lit (the shader), so resetting
+        // the build's steps under it shows nothing.
         if (world) {
+            world.set("uLeave", 1);
             world.set("uStream", 0);
             world.set("uPkg", 0);
             world.set("uCore", 0);
             world.set("uLabels", 0);
-            world.animate("uWorld", 0, 1.1, { ease: "inOut" });
+            // linear: each particle eases its own way off (the shader), so
+            // the fade is spread over the whole move, not bunched in its middle
+            world.animate("uWorld", 0, LEAVE_SECONDS, { ease: "linear" });
             world.animate("uFrame", 1.2, 6, { ease: "out" });
             world.animate("uElev", 0.1, 1.5);
             // face the build head-on, whatever the camera did before
@@ -746,6 +758,8 @@ export function startOnboarding(
                 `Built on this device in ${report.seconds.total} s, in ${report.directory}/`
             ]);
             if (world) {
+                // a new world bursts out (the world is gone by now: no jump)
+                world.set("uLeave", 0);
                 // the core bursts into the world; the camera is thrown back by
                 // the blast, then dives in, down to the ring's plane
                 world.ignite();
@@ -892,7 +906,15 @@ export function startOnboarding(
             fail(realStep, `no progress for ${STALL_SECONDS} seconds`);
         }, 2000);
 
+        // the bundle waits for the welcome's world to be gone (a fast build,
+        // a replay, gets there in a second, and its main-thread work would
+        // stutter the transition); a first download takes longer anyway
+        const leaveDone = new Promise<void>((resolve) =>
+            setTimeout(resolve, world && !reduced ? LEAVE_SECONDS * 1000 : 0)
+        );
+
         buildDemo(cloneDir, {
+            beforeBundle: () => leaveDone,
             onTarget(dir) {
                 targetDir = dir;
             },
@@ -942,6 +964,7 @@ export function startOnboarding(
             world.set("uPkg", 1);
             world.set("uCore", 1);
             world.set("uLabels", 0);
+            world.animate("uLeave", 0, 0.3);
             if (world.get("uWorld") < 1) world.animate("uWorld", 1, 1.2);
             world.animate("uFrame", 2.25, 2.5);
             world.animate("uElev", 0.36, 2.5);
