@@ -68,6 +68,9 @@ const LOW_END_PARTICLES = 1600;
 const MAX_GIT_PARTICLES = 700;
 const GLOWS = 4;
 const FOV = 50;
+// the world's height (planet, tilted ring, moons, seen from uElev) as a share
+// of the radius that frames its width
+const WORLD_HEIGHT = 0.72;
 // how long the world takes to follow a new area (as long as --fso-cy's
 // transition in styles.ts)
 export const AREA_SECONDS = 0.9;
@@ -604,13 +607,20 @@ export class World {
         this.moveArea(now);
 
         // camera: far enough to frame a sphere of radius uFrame in the area,
-        // on any aspect ratio, then turned by uElev and uAzim
+        // on any aspect ratio, then turned by uElev and uAzim. The world is
+        // flat (a planet in a ring): it only needs WORLD_HEIGHT of that
+        // radius in height, so a wide screen frames it much larger.
         const still = this.opts.reducedMotion;
         const aspect = this.width / this.height;
         const half = Math.tan((FOV * Math.PI) / 360);
         const vFov = 2 * Math.atan(half * this.areaHeight);
         const hFov = 2 * Math.atan(half * aspect);
-        const dist = this.values.uFrame / Math.sin(Math.min(vFov, hFov) / 2);
+        const frame = this.values.uFrame;
+        const tall = frame * (1 - (1 - WORLD_HEIGHT) * this.values.uWorld);
+        const dist = Math.max(
+            tall / Math.sin(vFov / 2),
+            frame / Math.sin(hFov / 2)
+        );
         const elev =
             this.values.uElev +
             (still ? 0 : Math.sin(this.elapsed * 0.11) * 0.03);
