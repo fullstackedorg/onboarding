@@ -107,13 +107,14 @@ The onboarding bundle carries its own copy of the runtime library, as every bund
 
 The shell (`fullstackedorg/shell`, a submodule of `fullstackedorg/fullstacked`) holds the terminal until a startup plugin decides. `./auto` marks a bare start; when a plugin replaced it, the shell publishes these on `globalThis.fullstackedShell` and fires `fullstackedshell`:
 
-| Hook                                     | What it does                                                                                                                                        |
-| :--------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `held`                                   | Set by the startup script as soon as it runs. Without it, the terminal opens after 3 s, so a script that failed to load never leaves a blank page.  |
-| `openTerminal()`                         | Opens the terminal, or shows it again after `hideTerminal()`. Resolves with the same `{ terminal, shell, fitAddon, keyboard, element }` every time. |
-| `hideTerminal()`                         | Hides the terminal (the shell fires `fullstackedshellhide`, and `fullstackedshellshow` when it is shown again).                                     |
-| `registerCommand(command)`               | Adds a command, listed by `help` and completed by Tab. Returns a function that removes it.                                                          |
-| `pauseDeeplinks()` / `resumeDeeplinks()` | Lets the plugin's own view handle deeplinks while it is shown.                                                                                      |
+| Hook                                     | What it does                                                                                                                                                                                 |
+| :--------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `held`                                   | Set by the startup script as soon as it runs. Without it, the terminal opens after 3 s, so a script that failed to load never leaves a blank page.                                           |
+| `openTerminal()`                         | Opens the terminal, or shows it again after `hideTerminal()`. Resolves with the same `{ terminal, shell, fitAddon, keyboard, element }` every time.                                          |
+| `hideTerminal()`                         | Hides the terminal (the shell fires `fullstackedshellhide`, and `fullstackedshellshow` when it is shown again).                                                                              |
+| `registerCommand(command)`               | Adds a command, listed by `help` and completed by Tab. Returns a function that removes it.                                                                                                   |
+| `pauseDeeplinks()` / `resumeDeeplinks()` | Lets the plugin's own view handle deeplinks while it is shown.                                                                                                                               |
+| `safe`                                   | `true` in safe mode (`process.env.SAFE` is `"1"`): the terminal is already open and `hideTerminal()` does nothing. The loader then opens the terminal and doesn't import the startup module. |
 
 `docs/contributing/building.md` in `fullstackedorg/fullstacked` has the details.
 

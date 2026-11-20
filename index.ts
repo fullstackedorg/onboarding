@@ -45,12 +45,17 @@ await new Promise((resolve) => {
     if (startup.openTerminal) resolve();
     else globalThis.addEventListener("fullstackedshell", resolve, { once: true });
 });
-try {
-    const { default: start } = await import(${JSON.stringify(module)});
-    await start(startup);
-} catch (e) {
-    console.error("startup:", e);
+// safe mode: the shell's terminal only, the startup script doesn't run
+if (startup.safe) {
     startup.openTerminal();
+} else {
+    try {
+        const { default: start } = await import(${JSON.stringify(module)});
+        await start(startup);
+    } catch (e) {
+        console.error("startup:", e);
+        startup.openTerminal();
+    }
 }
 `;
 }
