@@ -1,3 +1,4 @@
 [submodule "vendor/demo"]
 	path = vendor/demo
 	url = https://github.com/fullstackedorg/demo.git
+	branch = main

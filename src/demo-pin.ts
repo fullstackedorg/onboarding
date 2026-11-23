@@ -2,12 +2,12 @@
 // The onboarding clones DEMO_REPOSITORY, then checks out DEMO_COMMIT.
 
 export const DEMO_REPOSITORY = "https://github.com/fullstackedorg/demo.git";
-export const DEMO_COMMIT = "ca0272c1c5f5d57ce50b12ac84fda40024a3062e";
+export const DEMO_COMMIT = "5a50cfbb5aac21f97638fa14b576ae243bed2759";
 
 // What building the demo downloads at this commit, for the welcome screen
 export const DEMO_DOWNLOAD = {
-    gitObjects: 493,
-    gitBytes: 2285230,
+    gitObjects: 497,
+    gitBytes: 2286015,
     files: 24,
     packages: 7,
     packagesBytes: 5487550
