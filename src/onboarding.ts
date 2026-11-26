@@ -520,7 +520,6 @@ export function startOnboarding(
     }
 
     // 2. The build, drawn by the world while it happens
-    let built: BuildReport | null = null;
 
     function build() {
         const runId = ++buildRun;
@@ -785,7 +784,6 @@ export function startOnboarding(
         const runStep = (report: BuildReport) => {
             if (ran || !current()) return;
             ran = true;
-            built = report;
             chip.replaceChildren();
             say("running", WORDS.running);
             // lines the build wrote after its last step (build.json)
